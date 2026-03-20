@@ -109,19 +109,11 @@ export function validateCustomBoxConfig(config: CustomBoxConfig): CustomBoxValid
 }
 
 export function getInnerWidth(config: CustomBoxConfig): number {
-  if (config.assemblyMode === 'sides_over') {
-    return config.widthMm - (config.walls.left ? config.mainThicknessMm : 0) - (config.walls.right ? config.mainThicknessMm : 0);
-  }
-
-  return config.widthMm;
+  return config.widthMm - (config.walls.left ? config.mainThicknessMm : 0) - (config.walls.right ? config.mainThicknessMm : 0);
 }
 
 export function getInnerHeight(config: CustomBoxConfig): number {
-  if (config.assemblyMode === 'top_bottom_over') {
-    return config.heightMm - (config.walls.top ? config.mainThicknessMm : 0) - (config.walls.bottom ? config.mainThicknessMm : 0);
-  }
-
-  return config.heightMm;
+  return config.heightMm - (config.walls.top ? config.mainThicknessMm : 0) - (config.walls.bottom ? config.mainThicknessMm : 0);
 }
 
 export function generateCustomBoxBoards(config: CustomBoxConfig, globalThicknessMm: number): CustomBoxResult {
@@ -129,19 +121,24 @@ export function generateCustomBoxBoards(config: CustomBoxConfig, globalThickness
   const innerWidth = getInnerWidth(config);
   const innerHeight = getInnerHeight(config);
 
+  const sideHeight = config.assemblyMode === 'top_bottom_over' ? innerHeight : config.heightMm;
+  const sideY = config.assemblyMode === 'top_bottom_over'
+    ? (config.walls.bottom ? config.mainThicknessMm + sideHeight / 2 : sideHeight / 2)
+    : centeredY(config.heightMm);
+
   if (config.walls.left) {
     boards.push(createBoard({
       name: 'Left wall', role: 'side', orientation: 'YZ', material: 'Birch plywood',
-      width_mm: config.depthMm, height_mm: config.heightMm, thickness_mm: config.mainThicknessMm,
-      x_mm: config.mainThicknessMm / 2, y_mm: centeredY(config.heightMm), z_mm: centeredZ(config.depthMm),
+      width_mm: config.depthMm, height_mm: sideHeight, thickness_mm: config.mainThicknessMm,
+      x_mm: config.mainThicknessMm / 2, y_mm: sideY, z_mm: centeredZ(config.depthMm),
     }, globalThicknessMm));
   }
 
   if (config.walls.right) {
     boards.push(createBoard({
       name: 'Right wall', role: 'side', orientation: 'YZ', material: 'Birch plywood',
-      width_mm: config.depthMm, height_mm: config.heightMm, thickness_mm: config.mainThicknessMm,
-      x_mm: config.widthMm - config.mainThicknessMm / 2, y_mm: centeredY(config.heightMm), z_mm: centeredZ(config.depthMm),
+      width_mm: config.depthMm, height_mm: sideHeight, thickness_mm: config.mainThicknessMm,
+      x_mm: config.widthMm - config.mainThicknessMm / 2, y_mm: sideY, z_mm: centeredZ(config.depthMm),
     }, globalThicknessMm));
   }
 

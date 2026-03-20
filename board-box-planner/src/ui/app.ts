@@ -49,7 +49,7 @@ function createCustomGenerationModal(config: CustomBoxConfig, errors: Partial<Re
       <div class="modal-card">
         <div class="panel-header modal-header">
           <h2>Custom Generation</h2>
-          <button type="button" data-custom-close>Close</button>
+          <button type="button" data-custom-close>×</button>
         </div>
         <div class="modal-body">
           <section class="modal-section">
@@ -62,54 +62,54 @@ function createCustomGenerationModal(config: CustomBoxConfig, errors: Partial<Re
           </section>
 
           <section class="modal-section">
-            <h3>Wall selection</h3>
+            <h3>Walls</h3>
             <div class="checkbox-grid">
-              ${checkbox('left', 'Left wall')}
-              ${checkbox('right', 'Right wall')}
-              ${checkbox('top', 'Top wall')}
-              ${checkbox('bottom', 'Bottom wall')}
-              ${checkbox('back', 'Back wall')}
+              ${checkbox('left', 'Left')}
+              ${checkbox('right', 'Right')}
+              ${checkbox('top', 'Top')}
+              ${checkbox('bottom', 'Bottom')}
+              ${checkbox('back', 'Back')}
             </div>
           </section>
 
           <section class="modal-section">
             <h3>Assembly mode</h3>
-            <label class="radio-option"><input data-custom-assembly value="sides_over" type="radio" name="assemblyMode" ${config.assemblyMode === 'sides_over' ? 'checked' : ''} /> <span>Sides over</span><small>Side walls full height, top/bottom between.</small></label>
-            <label class="radio-option"><input data-custom-assembly value="top_bottom_over" type="radio" name="assemblyMode" ${config.assemblyMode === 'top_bottom_over' ? 'checked' : ''} /> <span>Top &amp; bottom over</span><small>Top/bottom full width, sides between.</small></label>
+            <label class="radio-option"><input data-custom-assembly value="sides_over" type="radio" name="assemblyMode" ${config.assemblyMode === 'sides_over' ? 'checked' : ''} /> <span>Sides over</span><small>Sides full height. Top/bottom fit between them.</small></label>
+            <label class="radio-option"><input data-custom-assembly value="top_bottom_over" type="radio" name="assemblyMode" ${config.assemblyMode === 'top_bottom_over' ? 'checked' : ''} /> <span>Top &amp; bottom over</span><small>Top/bottom full length. Sides fit between them.</small></label>
           </section>
 
           <section class="modal-section">
-            <h3>Thickness</h3>
+            <h3>Thicknesses</h3>
             <div class="form-grid compact-grid">
-              <label><span>Main thickness</span><input data-custom-number="mainThicknessMm" type="number" min="1" step="1" value="${config.mainThicknessMm}" />${fieldError('mainThicknessMm')}</label>
-              <label><span>Back wall thickness</span><input data-custom-number="backThicknessMm" type="number" min="1" step="1" value="${config.backThicknessMm}" />${fieldError('backThicknessMm')}</label>
+              <label><span>Main</span><input data-custom-number="mainThicknessMm" type="number" min="1" step="1" value="${config.mainThicknessMm}" />${fieldError('mainThicknessMm')}</label>
+              <label><span>Back thickness</span><input data-custom-number="backThicknessMm" type="number" min="1" step="1" value="${config.backThicknessMm}" />${fieldError('backThicknessMm')}</label>
             </div>
           </section>
 
           ${config.walls.back ? `
             <section class="modal-section">
-              <h3>Back wall configuration</h3>
-              <label class="radio-option"><input data-custom-back-mode value="inside" type="radio" name="backWallMode" ${config.backWallMode === 'inside' ? 'checked' : ''} /> <span>Inside</span><small>Back panel sits inside the box, between walls.</small></label>
-              <label class="radio-option"><input data-custom-back-mode value="overlay" type="radio" name="backWallMode" ${config.backWallMode === 'overlay' ? 'checked' : ''} /> <span>Overlay</span><small>Back panel covers the box from the outside.</small></label>
+              <h3>Back configuration</h3>
+              <label class="radio-option"><input data-custom-back-mode value="inside" type="radio" name="backWallMode" ${config.backWallMode === 'inside' ? 'checked' : ''} /> <span>Inside</span><small>Panel sits inside the box.</small></label>
+              <label class="radio-option"><input data-custom-back-mode value="overlay" type="radio" name="backWallMode" ${config.backWallMode === 'overlay' ? 'checked' : ''} /> <span>Overlay</span><small>Panel overlays the back side.</small></label>
               <div class="form-grid compact-grid">
-                <label><span>Back wall inset (mm)</span><input data-custom-number="backWallInsetMm" type="number" min="0" step="1" value="${config.backWallInsetMm}" ${config.backWallMode === 'inside' ? 'disabled' : ''} />${fieldError('backWallInsetMm')}${fieldError('backWallMode')}</label>
+                <label><span>Back inset (mm)</span><input data-custom-number="backWallInsetMm" type="number" min="0" step="1" value="${config.backWallInsetMm}" ${config.backWallMode === 'inside' ? 'disabled' : ''} />${fieldError('backWallInsetMm')}${fieldError('backWallMode')}</label>
               </div>
             </section>
           ` : ''}
 
           <section class="modal-section">
             <h3>Doors</h3>
-            <label class="check-option"><input data-custom-doors-enabled type="checkbox" ${config.doors.enabled ? 'checked' : ''} /> <span>Add front doors</span></label>
+            <label class="check-option"><input data-custom-doors-enabled type="checkbox" ${config.doors.enabled ? 'checked' : ''} /> <span>Front doors</span></label>
             ${config.doors.enabled ? `
               <div class="form-grid compact-grid nested-grid">
-                <label><span>Door count</span>
+                <label><span>Count</span>
                   <select data-custom-door-count>
                     <option value="1" ${config.doors.count === 1 ? 'selected' : ''}>1</option>
                     <option value="2" ${config.doors.count === 2 ? 'selected' : ''}>2</option>
                   </select>
                 </label>
-                <label><span>Vertical gap (top &amp; bottom), mm</span><input data-custom-number="verticalGapMm" type="number" min="0" step="1" value="${config.doors.verticalGapMm}" />${fieldError('verticalGapMm')}</label>
-                <label><span>Horizontal gap (left &amp; right + between doors), mm</span><input data-custom-number="horizontalGapMm" type="number" min="0" step="1" value="${config.doors.horizontalGapMm}" />${fieldError('horizontalGapMm')}</label>
+                <label><span>Top/bottom gap, mm</span><input data-custom-number="verticalGapMm" type="number" min="0" step="1" value="${config.doors.verticalGapMm}" />${fieldError('verticalGapMm')}</label>
+                <label><span>Side gap / center gap, mm</span><input data-custom-number="horizontalGapMm" type="number" min="0" step="1" value="${config.doors.horizontalGapMm}" />${fieldError('horizontalGapMm')}</label>
               </div>
             ` : ''}
           </section>
@@ -217,10 +217,14 @@ export function createApp(root: HTMLElement): void {
   );
 
   const renderCustomModal = (): void => {
+    const previousScrollTop = modalRoot.querySelector<HTMLElement>('.modal-body')?.scrollTop ?? 0;
     const validation = validateCustomBoxConfig(customConfig);
     modalRoot.innerHTML = createCustomGenerationModal(customConfig, validation.errors);
     const modal = modalRoot.querySelector<HTMLElement>('[data-custom-modal]');
     if (!modal) return;
+
+    const modalBody = modal.querySelector<HTMLElement>('.modal-body');
+    if (modalBody) modalBody.scrollTop = previousScrollTop;
 
     modal.querySelectorAll<HTMLElement>('[data-custom-close]').forEach((element) => {
       element.addEventListener('click', () => {
