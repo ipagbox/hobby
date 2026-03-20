@@ -6,7 +6,7 @@ import { boardSizeVector, type Board } from '../domain/model';
 const CAMERA_DISTANCE = 1800;
 type BoardPosition = Pick<Board, 'x_mm' | 'y_mm' | 'z_mm'>;
 
-function createBoardMaterial(selected: boolean): THREE.MeshStandardMaterial {
+function createBoardMaterial(selected: boolean) {
   return new THREE.MeshStandardMaterial({
     color: selected ? 0xff8a3d : 0x8ab4f8,
     roughness: 0.85,
@@ -14,16 +14,16 @@ function createBoardMaterial(selected: boolean): THREE.MeshStandardMaterial {
   });
 }
 
-function disposeBoardMesh(mesh: THREE.Mesh): void {
+function disposeBoardMesh(mesh: any): void {
   mesh.geometry.dispose();
   const material = mesh.material;
   if (Array.isArray(material)) {
-    material.forEach((entry) => entry.dispose());
+    material.forEach((entry: any) => entry.dispose());
   } else {
     material.dispose();
   }
-  mesh.children.forEach((child: THREE.Object3D) => {
-    const line = child as THREE.LineSegments;
+  mesh.children.forEach((child: any) => {
+    const line = child as any;
     line.geometry?.dispose?.();
     const childMaterial = line.material;
     if (Array.isArray(childMaterial)) {
@@ -34,10 +34,10 @@ function disposeBoardMesh(mesh: THREE.Mesh): void {
   });
 }
 
-function updateBoardGeometry(mesh: THREE.Mesh, size: [number, number, number]): void {
+function updateBoardGeometry(mesh: any, size: [number, number, number]): void {
   mesh.geometry.dispose();
-  mesh.children.forEach((child: THREE.Object3D) => {
-    const line = child as THREE.LineSegments;
+  mesh.children.forEach((child: any) => {
+    const line = child as any;
     line.geometry?.dispose?.();
     line.material?.dispose?.();
   });
@@ -56,17 +56,17 @@ function updateBoardGeometry(mesh: THREE.Mesh, size: [number, number, number]): 
 
 export class PlannerScene {
   private readonly scene = new THREE.Scene();
-  private readonly camera: THREE.PerspectiveCamera;
-  private readonly renderer: THREE.WebGLRenderer;
-  private readonly controls: OrbitControls;
-  private readonly transformControls: TransformControls;
+  private readonly camera: any;
+  private readonly renderer: any;
+  private readonly controls: any;
+  private readonly transformControls: any;
   private readonly raycaster = new THREE.Raycaster();
   private readonly pointer = new THREE.Vector2();
   private readonly boardGroup = new THREE.Group();
   private readonly grid = new THREE.GridHelper(2000, 200, 0x666666, 0x333333);
   private readonly axes = new THREE.AxesHelper(250);
   private animationFrame = 0;
-  private readonly boardMeshes = new Map<string, THREE.Mesh>();
+  private readonly boardMeshes = new Map<string, any>();
   private onBoardSelected: (id: string | null) => void;
   private onBoardMoved: (id: string, position: Partial<BoardPosition>) => void;
 
@@ -95,8 +95,8 @@ export class PlannerScene {
     this.transformControls.setSpace('world');
     this.transformControls.addEventListener('dragging-changed', ((event: { value: boolean }) => {
       this.controls.enabled = !event.value;
-    }) as THREE.EventListener);
-    this.transformControls.addEventListener('objectChange', this.handleTransformChange as THREE.EventListener);
+    }) as unknown as EventListener);
+    this.transformControls.addEventListener('objectChange', this.handleTransformChange as EventListener);
 
     this.scene.add(this.grid);
     this.scene.add(this.axes);
@@ -118,7 +118,7 @@ export class PlannerScene {
     cancelAnimationFrame(this.animationFrame);
     this.renderer.domElement.removeEventListener('pointerdown', this.handlePointerDown);
     window.removeEventListener('resize', this.resize);
-    this.transformControls.removeEventListener('objectChange', this.handleTransformChange as THREE.EventListener);
+    this.transformControls.removeEventListener('objectChange', this.handleTransformChange as EventListener);
     this.controls.dispose();
     this.transformControls.dispose();
     this.renderer.dispose();
@@ -163,7 +163,7 @@ export class PlannerScene {
         if (!currentSize || currentSize.some((value, index) => Math.abs(value - [sx, sy, sz][index]) > 0.001)) {
           updateBoardGeometry(mesh, [sx, sy, sz]);
         }
-        (mesh.material as THREE.MeshStandardMaterial).color.set(board.id === selectedBoardId ? 0xff8a3d : 0x8ab4f8);
+        (mesh.material as any).color.set(board.id === selectedBoardId ? 0xff8a3d : 0x8ab4f8);
       }
 
       mesh.position.set(board.x_mm, board.y_mm, board.z_mm);
@@ -230,8 +230,8 @@ export class PlannerScene {
     this.pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     this.pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
     this.raycaster.setFromCamera(this.pointer, this.camera);
-    const hits: Array<{ object: THREE.Object3D }> = this.raycaster.intersectObjects(this.boardGroup.children, true) as Array<{ object: THREE.Object3D }>;
-    const target = hits.find((hit: { object: THREE.Object3D }) => hit.object instanceof THREE.Mesh && hit.object.userData.boardId) ?? null;
+    const hits: Array<{ object: any }> = this.raycaster.intersectObjects(this.boardGroup.children, true) as Array<{ object: any }>;
+    const target = hits.find((hit: { object: any }) => hit.object instanceof THREE.Mesh && hit.object.userData.boardId) ?? null;
     this.onBoardSelected(target?.object.userData.boardId ?? null);
   };
 
