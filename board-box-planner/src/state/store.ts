@@ -1,5 +1,6 @@
 import { boardSizeVector, createBoard, createEmptyProject, projectFromJson, projectToJson, type Board, type Orientation, type Project } from '../domain/model';
 import { sampleProjectJson } from '../assets/sampleProject';
+import { generateCustomBoxBoards, type CustomBoxConfig } from '../domain/customBox';
 
 export interface AppState {
   project: Project;
@@ -185,6 +186,18 @@ export class PlannerStore {
 
   setOrientation(id: string, orientation: Orientation): void {
     this.updateBoard(id, { orientation });
+  }
+
+
+  generateCustomBox(config: CustomBoxConfig): void {
+    this.mutate((state) => {
+      state.project = {
+        ...state.project,
+        board_thickness_mm: config.mainThicknessMm,
+        boards: generateCustomBoxBoards(config, config.mainThicknessMm).boards,
+      };
+      state.selectedBoardId = state.project.boards[0]?.id ?? null;
+    });
   }
 
   loadSampleProject(): void {

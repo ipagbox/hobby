@@ -1,4 +1,10 @@
-import { ORIENTATION_OPTIONS, ROLE_OPTIONS, SNAP_STEPS_MM, type Board } from '../domain/model';
+import { ORIENTATION_OPTIONS, ROLE_OPTIONS, SNAP_STEPS_MM, DEFAULT_BOARD_THICKNESS_MM, type Board } from '../domain/model';
+import {
+  validateCustomBoxConfig,
+  type AssemblyMode,
+  type BackWallMode,
+  type CustomBoxConfig,
+} from '../domain/customBox';
 import { PlannerScene } from '../scene/PlannerScene';
 import { PlannerStore, type AppState } from '../state/store';
 
@@ -12,8 +18,114 @@ function mmInput(label: string, value: number): string {
   return `<label><span>${label}</span><input data-number-input="${label}" type="number" value="${value}" step="1" /></label>`;
 }
 
+function getDefaultCustomConfig(globalThicknessMm: number): CustomBoxConfig {
+  const mainThicknessMm = globalThicknessMm || DEFAULT_BOARD_THICKNESS_MM;
+  return {
+    widthMm: 600,
+    heightMm: 720,
+    depthMm: 350,
+    walls: { left: true, right: true, top: true, bottom: true, back: true },
+    assemblyMode: 'sides_over',
+    mainThicknessMm,
+    backThicknessMm: 4,
+    backWallMode: 'inside',
+    backWallInsetMm: 0,
+    doors: { enabled: false, count: 2, verticalGapMm: 2, horizontalGapMm: 2 },
+  };
+}
+
+function escapeHtml(value: string): string {
+  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function createCustomGenerationModal(config: CustomBoxConfig, errors: Partial<Record<string, string>>): string {
+  const fieldError = (key: string) => (errors[key] ? `<span class="field-error">${escapeHtml(errors[key] ?? '')}</span>` : '');
+  const checkbox = (key: keyof CustomBoxConfig['walls'], label: string) => `
+    <label class="check-option"><input data-custom-wall="${key}" type="checkbox" ${config.walls[key] ? 'checked' : ''} /> <span>${label}</span></label>
+  `;
+
+  return `
+    <div class="modal-backdrop" data-custom-modal>
+      <div class="modal-card">
+        <div class="panel-header modal-header">
+          <h2>Custom Generation</h2>
+          <button type="button" data-custom-close>Close</button>
+        </div>
+        <div class="modal-body">
+          <section class="modal-section">
+            <h3>Dimensions (mm)</h3>
+            <div class="form-grid compact-grid">
+              <label><span>Width</span><input data-custom-number="widthMm" type="number" min="1" step="1" value="${config.widthMm}" />${fieldError('widthMm')}</label>
+              <label><span>Height</span><input data-custom-number="heightMm" type="number" min="1" step="1" value="${config.heightMm}" />${fieldError('heightMm')}</label>
+              <label><span>Depth</span><input data-custom-number="depthMm" type="number" min="1" step="1" value="${config.depthMm}" />${fieldError('depthMm')}</label>
+            </div>
+          </section>
+
+          <section class="modal-section">
+            <h3>Wall selection</h3>
+            <div class="checkbox-grid">
+              ${checkbox('left', 'Left wall')}
+              ${checkbox('right', 'Right wall')}
+              ${checkbox('top', 'Top wall')}
+              ${checkbox('bottom', 'Bottom wall')}
+              ${checkbox('back', 'Back wall')}
+            </div>
+          </section>
+
+          <section class="modal-section">
+            <h3>Assembly mode</h3>
+            <label class="radio-option"><input data-custom-assembly value="sides_over" type="radio" name="assemblyMode" ${config.assemblyMode === 'sides_over' ? 'checked' : ''} /> <span>Sides over</span><small>Side walls full height, top/bottom between.</small></label>
+            <label class="radio-option"><input data-custom-assembly value="top_bottom_over" type="radio" name="assemblyMode" ${config.assemblyMode === 'top_bottom_over' ? 'checked' : ''} /> <span>Top &amp; bottom over</span><small>Top/bottom full width, sides between.</small></label>
+          </section>
+
+          <section class="modal-section">
+            <h3>Thickness</h3>
+            <div class="form-grid compact-grid">
+              <label><span>Main thickness</span><input data-custom-number="mainThicknessMm" type="number" min="1" step="1" value="${config.mainThicknessMm}" />${fieldError('mainThicknessMm')}</label>
+              <label><span>Back wall thickness</span><input data-custom-number="backThicknessMm" type="number" min="1" step="1" value="${config.backThicknessMm}" />${fieldError('backThicknessMm')}</label>
+            </div>
+          </section>
+
+          ${config.walls.back ? `
+            <section class="modal-section">
+              <h3>Back wall configuration</h3>
+              <label class="radio-option"><input data-custom-back-mode value="inside" type="radio" name="backWallMode" ${config.backWallMode === 'inside' ? 'checked' : ''} /> <span>Inside</span><small>Back panel sits inside the box, between walls.</small></label>
+              <label class="radio-option"><input data-custom-back-mode value="overlay" type="radio" name="backWallMode" ${config.backWallMode === 'overlay' ? 'checked' : ''} /> <span>Overlay</span><small>Back panel covers the box from the outside.</small></label>
+              <div class="form-grid compact-grid">
+                <label><span>Back wall inset (mm)</span><input data-custom-number="backWallInsetMm" type="number" min="0" step="1" value="${config.backWallInsetMm}" ${config.backWallMode === 'inside' ? 'disabled' : ''} />${fieldError('backWallInsetMm')}${fieldError('backWallMode')}</label>
+              </div>
+            </section>
+          ` : ''}
+
+          <section class="modal-section">
+            <h3>Doors</h3>
+            <label class="check-option"><input data-custom-doors-enabled type="checkbox" ${config.doors.enabled ? 'checked' : ''} /> <span>Add front doors</span></label>
+            ${config.doors.enabled ? `
+              <div class="form-grid compact-grid nested-grid">
+                <label><span>Door count</span>
+                  <select data-custom-door-count>
+                    <option value="1" ${config.doors.count === 1 ? 'selected' : ''}>1</option>
+                    <option value="2" ${config.doors.count === 2 ? 'selected' : ''}>2</option>
+                  </select>
+                </label>
+                <label><span>Vertical gap (top &amp; bottom), mm</span><input data-custom-number="verticalGapMm" type="number" min="0" step="1" value="${config.doors.verticalGapMm}" />${fieldError('verticalGapMm')}</label>
+                <label><span>Horizontal gap (left &amp; right + between doors), mm</span><input data-custom-number="horizontalGapMm" type="number" min="0" step="1" value="${config.doors.horizontalGapMm}" />${fieldError('horizontalGapMm')}</label>
+              </div>
+            ` : ''}
+          </section>
+        </div>
+        <div class="modal-actions">
+          <button type="button" data-custom-close>Cancel</button>
+          <button type="button" data-custom-confirm ${Object.keys(errors).length ? 'disabled' : ''}>Generate</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 export function createApp(root: HTMLElement): void {
   const store = new PlannerStore();
+  let customConfig = getDefaultCustomConfig(store.getState().project.board_thickness_mm);
 
   root.innerHTML = `
     <div class="app-shell">
@@ -27,7 +139,7 @@ export function createApp(root: HTMLElement): void {
         <div class="toolbar-group">
           <button data-action="save">Save project</button>
           <label class="file-button">Load project<input data-action="load" type="file" accept="application/json" hidden /></label>
-          <button data-action="load-sample">Load sample</button>
+          <button data-action="custom-generation">Custom Generation</button>
         </div>
         <div class="toolbar-group">
           <button data-action="reset-camera">Reset camera</button>
@@ -78,6 +190,7 @@ export function createApp(root: HTMLElement): void {
         </section>
         <aside class="panel properties-panel" data-properties-panel></aside>
       </main>
+      <div data-modal-root></div>
     </div>
   `;
 
@@ -89,8 +202,9 @@ export function createApp(root: HTMLElement): void {
   const gridToggle = root.querySelector<HTMLInputElement>('[data-action="toggle-grid"]');
   const snapSelect = root.querySelector<HTMLSelectElement>('[data-action="snap-step"]');
   const loadInput = root.querySelector<HTMLInputElement>('[data-action="load"]');
+  const modalRoot = root.querySelector<HTMLElement>('[data-modal-root]');
 
-  if (!viewport || !boardList || !propertiesPanel || !projectNameInput || !projectThicknessInput || !gridToggle || !snapSelect || !loadInput) {
+  if (!viewport || !boardList || !propertiesPanel || !projectNameInput || !projectThicknessInput || !gridToggle || !snapSelect || !loadInput || !modalRoot) {
     throw new Error('App UI failed to initialize');
   }
 
@@ -101,6 +215,76 @@ export function createApp(root: HTMLElement): void {
     (id) => store.setSelectedBoard(id),
     (id, position) => store.moveBoardToPosition(id, position),
   );
+
+  const renderCustomModal = (): void => {
+    const validation = validateCustomBoxConfig(customConfig);
+    modalRoot.innerHTML = createCustomGenerationModal(customConfig, validation.errors);
+    const modal = modalRoot.querySelector<HTMLElement>('[data-custom-modal]');
+    if (!modal) return;
+
+    modal.querySelectorAll<HTMLElement>('[data-custom-close]').forEach((element) => {
+      element.addEventListener('click', () => {
+        modalRoot.innerHTML = '';
+      });
+    });
+
+    modal.querySelectorAll<HTMLInputElement>('[data-custom-number]').forEach((input) => {
+      input.addEventListener('input', () => {
+        const key = input.dataset.customNumber as string;
+        const value = Number(input.value);
+        if (key === 'verticalGapMm' || key === 'horizontalGapMm') {
+          customConfig = { ...customConfig, doors: { ...customConfig.doors, [key]: value } };
+        } else {
+          customConfig = { ...customConfig, [key]: value } as CustomBoxConfig;
+        }
+        renderCustomModal();
+      });
+    });
+
+    modal.querySelectorAll<HTMLInputElement>('[data-custom-wall]').forEach((input) => {
+      input.addEventListener('change', () => {
+        const wall = input.dataset.customWall as keyof CustomBoxConfig['walls'];
+        customConfig = { ...customConfig, walls: { ...customConfig.walls, [wall]: input.checked } };
+        renderCustomModal();
+      });
+    });
+
+    modal.querySelectorAll<HTMLInputElement>('[data-custom-assembly]').forEach((input) => {
+      input.addEventListener('change', () => {
+        customConfig = { ...customConfig, assemblyMode: input.value as AssemblyMode };
+        renderCustomModal();
+      });
+    });
+
+    modal.querySelectorAll<HTMLInputElement>('[data-custom-back-mode]').forEach((input) => {
+      input.addEventListener('change', () => {
+        customConfig = { ...customConfig, backWallMode: input.value as BackWallMode };
+        renderCustomModal();
+      });
+    });
+
+    const doorsEnabled = modal.querySelector<HTMLInputElement>('[data-custom-doors-enabled]');
+    doorsEnabled?.addEventListener('change', () => {
+      customConfig = { ...customConfig, doors: { ...customConfig.doors, enabled: doorsEnabled.checked } };
+      renderCustomModal();
+    });
+
+    const doorCount = modal.querySelector<HTMLSelectElement>('[data-custom-door-count]');
+    doorCount?.addEventListener('change', () => {
+      customConfig = { ...customConfig, doors: { ...customConfig.doors, count: Number(doorCount.value) as 1 | 2 } };
+      renderCustomModal();
+    });
+
+    modal.querySelector<HTMLButtonElement>('[data-custom-confirm]')?.addEventListener('click', () => {
+      const latestValidation = validateCustomBoxConfig(customConfig);
+      if (!latestValidation.isValid) {
+        renderCustomModal();
+        return;
+      }
+      store.generateCustomBox(customConfig);
+      modalRoot.innerHTML = '';
+    });
+  };
 
   root.querySelectorAll<HTMLButtonElement>('[data-action]').forEach((button) => {
     button.addEventListener('click', () => {
@@ -124,8 +308,12 @@ export function createApp(root: HTMLElement): void {
         case 'reset-camera':
           scene.resetCamera();
           break;
-        case 'load-sample':
-          store.loadSampleProject();
+        case 'custom-generation':
+          customConfig = {
+            ...customConfig,
+            mainThicknessMm: store.getState().project.board_thickness_mm || DEFAULT_BOARD_THICKNESS_MM,
+          };
+          renderCustomModal();
           break;
       }
     });
@@ -212,7 +400,7 @@ export function createApp(root: HTMLElement): void {
     propertiesPanel.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>('[data-field]').forEach((field) => {
       field.addEventListener('change', () => {
         const key = field.dataset.field as keyof Board;
-        const value = field instanceof HTMLSelectElement || field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement ? field.value : '';
+        const value = field.value;
         if (key === 'orientation') {
           store.setOrientation(board.id, value as Board['orientation']);
           return;
