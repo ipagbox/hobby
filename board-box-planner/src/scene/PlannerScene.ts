@@ -1,8 +1,10 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
 import { boardSizeVector, type Board } from '../domain/model';
 
 const CAMERA_DISTANCE = 1800;
+type BoardPosition = Pick<Board, 'x_mm' | 'y_mm' | 'z_mm'>;
 
 function createBoardMaterial(selected: boolean): THREE.MeshStandardMaterial {
   return new THREE.MeshStandardMaterial({
@@ -17,6 +19,7 @@ export class PlannerScene {
   private readonly camera: THREE.PerspectiveCamera;
   private readonly renderer: THREE.WebGLRenderer;
   private readonly controls: OrbitControls;
+  private readonly transformControls: TransformControls;
   private readonly raycaster = new THREE.Raycaster();
   private readonly pointer = new THREE.Vector2();
   private readonly boardGroup = new THREE.Group();
@@ -25,9 +28,15 @@ export class PlannerScene {
   private animationFrame = 0;
   private readonly boardMeshes = new Map<string, THREE.Mesh>();
   private onBoardSelected: (id: string | null) => void;
+  private onBoardMoved: (id: string, position: Partial<BoardPosition>) => void;
 
-  constructor(container: HTMLElement, onBoardSelected: (id: string | null) => void) {
+  constructor(
+    container: HTMLElement,
+    onBoardSelected: (id: string | null) => void,
+    onBoardMoved: (id: string, position: Partial<BoardPosition>) => void,
+  ) {
     this.onBoardSelected = onBoardSelected;
+    this.onBoardMoved = onBoardMoved;
     this.scene.background = new THREE.Color(0x111827);
 
     this.camera = new THREE.PerspectiveCamera(50, 1, 1, 10000);
@@ -41,9 +50,18 @@ export class PlannerScene {
     this.controls.enableDamping = true;
     this.controls.target.set(300, 240, 300);
 
+    this.transformControls = new TransformControls(this.camera, this.renderer.domElement);
+    this.transformControls.setMode('translate');
+    this.transformControls.setSpace('world');
+    this.transformControls.addEventListener('dragging-changed', ((event: { value: boolean }) => {
+      this.controls.enabled = !event.value;
+    }) as THREE.EventListener);
+    this.transformControls.addEventListener('objectChange', this.handleTransformChange as THREE.EventListener);
+
     this.scene.add(this.grid);
     this.scene.add(this.axes);
     this.scene.add(this.boardGroup);
+    this.scene.add(this.transformControls);
 
     this.scene.add(new THREE.AmbientLight(0xffffff, 0.7));
     const directional = new THREE.DirectionalLight(0xffffff, 1.1);
@@ -60,7 +78,9 @@ export class PlannerScene {
     cancelAnimationFrame(this.animationFrame);
     this.renderer.domElement.removeEventListener('pointerdown', this.handlePointerDown);
     window.removeEventListener('resize', this.resize);
+    this.transformControls.removeEventListener('objectChange', this.handleTransformChange as THREE.EventListener);
     this.controls.dispose();
+    this.transformControls.dispose();
     this.renderer.dispose();
   }
 
@@ -91,6 +111,15 @@ export class PlannerScene {
       this.boardMeshes.set(board.id, mesh);
       this.boardGroup.add(mesh);
     });
+
+    const selectedMesh = selectedBoardId ? this.boardMeshes.get(selectedBoardId) ?? null : null;
+    if (selectedMesh) {
+      this.transformControls.attach(selectedMesh);
+      this.transformControls.enabled = true;
+    } else {
+      this.transformControls.detach();
+      this.transformControls.enabled = false;
+    }
   }
 
   resetCamera(): void {
@@ -126,7 +155,20 @@ export class PlannerScene {
     this.controls.update();
   }
 
+  private handleTransformChange = (): void => {
+    const object = this.transformControls.object;
+    if (!object?.userData.boardId) return;
+    this.onBoardMoved(object.userData.boardId, {
+      x_mm: object.position.x,
+      y_mm: object.position.y,
+      z_mm: object.position.z,
+    });
+  };
+
   private handlePointerDown = (event: PointerEvent): void => {
+    if (this.transformControls.dragging) {
+      return;
+    }
     const rect = this.renderer.domElement.getBoundingClientRect();
     this.pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     this.pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;

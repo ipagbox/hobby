@@ -2,6 +2,12 @@ import { ORIENTATION_OPTIONS, ROLE_OPTIONS, SNAP_STEPS_MM, type Board } from '..
 import { PlannerScene } from '../scene/PlannerScene';
 import { PlannerStore, type AppState } from '../state/store';
 
+const AXIS_BUTTONS: Array<{ axis: 'x_mm' | 'y_mm' | 'z_mm'; label: string; colorClass: string }> = [
+  { axis: 'x_mm', label: 'X', colorClass: 'axis-x' },
+  { axis: 'y_mm', label: 'Y', colorClass: 'axis-y' },
+  { axis: 'z_mm', label: 'Z', colorClass: 'axis-z' },
+];
+
 function mmInput(label: string, value: number): string {
   return `<label><span>${label}</span><input data-number-input="${label}" type="number" value="${value}" step="1" /></label>`;
 }
@@ -58,13 +64,15 @@ export function createApp(root: HTMLElement): void {
           <div class="viewport" data-viewport></div>
           <div class="move-pad">
             <span>Move selected</span>
-            <div>
-              <button data-move="x_mm:-1">X-</button>
-              <button data-move="x_mm:1">X+</button>
-              <button data-move="y_mm:-1">Y-</button>
-              <button data-move="y_mm:1">Y+</button>
-              <button data-move="z_mm:-1">Z-</button>
-              <button data-move="z_mm:1">Z+</button>
+            <div class="move-pad-grid">
+              ${AXIS_BUTTONS.map(
+                ({ axis, label, colorClass }) => `
+                  <div class="move-axis-group">
+                    <button class="${colorClass}" data-move="${axis}:1">${label}+</button>
+                    <button class="${colorClass}" data-move="${axis}:-1">${label}-</button>
+                  </div>
+                `,
+              ).join('')}
             </div>
           </div>
         </section>
@@ -88,7 +96,11 @@ export function createApp(root: HTMLElement): void {
 
   snapSelect.innerHTML = SNAP_STEPS_MM.map((step) => `<option value="${step}">${step} mm</option>`).join('');
 
-  const scene = new PlannerScene(viewport, (id) => store.setSelectedBoard(id));
+  const scene = new PlannerScene(
+    viewport,
+    (id) => store.setSelectedBoard(id),
+    (id, position) => store.moveBoardToPosition(id, position),
+  );
 
   root.querySelectorAll<HTMLButtonElement>('[data-action]').forEach((button) => {
     button.addEventListener('click', () => {
@@ -188,7 +200,12 @@ export function createApp(root: HTMLElement): void {
     propertiesPanel.querySelectorAll<HTMLInputElement>('[data-number-input]').forEach((input) => {
       input.addEventListener('change', () => {
         const field = input.dataset.numberInput as keyof Board;
-        store.updateBoard(board.id, { [field]: Number(input.value) } as Partial<Board>);
+        const value = Number(input.value);
+        if (field === 'x_mm' || field === 'y_mm' || field === 'z_mm') {
+          store.moveBoardToPosition(board.id, { [field]: value } as Partial<Pick<Board, 'x_mm' | 'y_mm' | 'z_mm'>>);
+          return;
+        }
+        store.updateBoard(board.id, { [field]: value } as Partial<Board>);
       });
     });
 

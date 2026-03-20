@@ -1,4 +1,4 @@
-import { createBoard, createEmptyProject, projectFromJson, projectToJson, type Board, type Orientation, type Project } from '../domain/model';
+import { boardSizeVector, createBoard, createEmptyProject, projectFromJson, projectToJson, type Board, type Orientation, type Project } from '../domain/model';
 import { sampleProjectJson } from '../assets/sampleProject';
 
 export interface AppState {
@@ -8,11 +8,65 @@ export interface AppState {
 
 export type Listener = (state: AppState) => void;
 
+type BoardPosition = Pick<Board, 'x_mm' | 'y_mm' | 'z_mm'>;
+const POSITION_AXES: Array<keyof BoardPosition> = ['x_mm', 'y_mm', 'z_mm'];
+
 function cloneState(state: AppState): AppState {
   return {
     project: JSON.parse(JSON.stringify(state.project)) as Project,
     selectedBoardId: state.selectedBoardId,
   };
+}
+
+function boardExtents(board: Board): Record<keyof BoardPosition, { min: number; max: number }> {
+  const [sx, sy, sz] = boardSizeVector(board);
+  return {
+    x_mm: { min: board.x_mm - sx / 2, max: board.x_mm + sx / 2 },
+    y_mm: { min: board.y_mm - sy / 2, max: board.y_mm + sy / 2 },
+    z_mm: { min: board.z_mm - sz / 2, max: board.z_mm + sz / 2 },
+  };
+}
+
+function snapAxisPosition(board: Board, others: Board[], axis: keyof BoardPosition, threshold: number): number {
+  const movingExtents = boardExtents(board);
+  let bestPosition = board[axis];
+  let bestDistance = threshold + 1;
+
+  for (const other of others) {
+    const otherExtents = boardExtents(other);
+    const candidates = [
+      otherExtents[axis].min + (board[axis] - movingExtents[axis].max),
+      otherExtents[axis].max + (board[axis] - movingExtents[axis].min),
+      other[axis],
+    ];
+
+    for (const candidate of candidates) {
+      const distance = Math.abs(candidate - board[axis]);
+      if (distance <= threshold && distance < bestDistance) {
+        bestDistance = distance;
+        bestPosition = candidate;
+      }
+    }
+  }
+
+  return bestPosition;
+}
+
+function getSnappedPosition(project: Project, boardId: string, partial: Partial<BoardPosition>): Partial<BoardPosition> {
+  const board = project.boards.find((item) => item.id === boardId);
+  if (!board) return partial;
+  const draft = { ...board, ...partial };
+  const others = project.boards.filter((item) => item.id !== boardId);
+  const threshold = project.settings.snapStepMm;
+  const nextPosition: Partial<BoardPosition> = { ...partial };
+
+  for (const axis of POSITION_AXES) {
+    if (partial[axis] === undefined) continue;
+    draft[axis] = snapAxisPosition(draft, others, axis, threshold);
+    nextPosition[axis] = draft[axis];
+  }
+
+  return nextPosition;
 }
 
 export class PlannerStore {
@@ -115,10 +169,18 @@ export class PlannerStore {
     });
   }
 
-  moveSelectedBoard(axis: 'x_mm' | 'y_mm' | 'z_mm', delta: number): void {
+  moveBoardToPosition(id: string, partial: Partial<BoardPosition>): void {
+    this.mutate((state) => {
+      const board = state.project.boards.find((item) => item.id === id);
+      if (!board) return;
+      Object.assign(board, getSnappedPosition(state.project, id, partial));
+    });
+  }
+
+  moveSelectedBoard(axis: keyof BoardPosition, delta: number): void {
     const selected = this.getSelectedBoard();
     if (!selected) return;
-    this.updateBoard(selected.id, { [axis]: selected[axis] + delta } as Pick<Board, typeof axis>);
+    this.moveBoardToPosition(selected.id, { [axis]: selected[axis] + delta } as Partial<BoardPosition>);
   }
 
   setOrientation(id: string, orientation: Orientation): void {
