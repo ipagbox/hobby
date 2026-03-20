@@ -37,7 +37,12 @@ button { cursor: pointer; }
 .move-pad {
   position: absolute; left: 1rem; bottom: 1rem; display: flex; flex-direction: column; gap: 0.5rem; padding: 0.75rem; background: rgba(15, 23, 42, 0.85); border: 1px solid #334155; border-radius: 10px;
 }
-.move-pad > div { display: grid; grid-template-columns: repeat(3, auto); gap: 0.4rem; }
+.move-pad-grid { display: grid; grid-template-columns: repeat(2, minmax(0, auto)); gap: 0.5rem; }
+.move-axis-group { display: contents; }
+.move-pad button { min-width: 64px; font-weight: 600; }
+.move-pad .axis-x { color: #f87171; border-color: rgba(248, 113, 113, 0.7); }
+.move-pad .axis-y { color: #4ade80; border-color: rgba(74, 222, 128, 0.7); }
+.move-pad .axis-z { color: #60a5fa; border-color: rgba(96, 165, 250, 0.7); }
 .form-grid { display: grid; gap: 0.75rem; grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: auto; }
 .form-grid .full-width { grid-column: 1 / -1; }
 input, select, textarea, button, .file-button {
