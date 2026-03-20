@@ -14,6 +14,46 @@ function createBoardMaterial(selected: boolean): THREE.MeshStandardMaterial {
   });
 }
 
+function disposeBoardMesh(mesh: THREE.Mesh): void {
+  mesh.geometry.dispose();
+  const material = mesh.material;
+  if (Array.isArray(material)) {
+    material.forEach((entry) => entry.dispose());
+  } else {
+    material.dispose();
+  }
+  mesh.children.forEach((child: THREE.Object3D) => {
+    const line = child as THREE.LineSegments;
+    line.geometry?.dispose?.();
+    const childMaterial = line.material;
+    if (Array.isArray(childMaterial)) {
+      childMaterial.forEach((entry) => entry.dispose());
+    } else {
+      childMaterial?.dispose?.();
+    }
+  });
+}
+
+function updateBoardGeometry(mesh: THREE.Mesh, size: [number, number, number]): void {
+  mesh.geometry.dispose();
+  mesh.children.forEach((child: THREE.Object3D) => {
+    const line = child as THREE.LineSegments;
+    line.geometry?.dispose?.();
+    line.material?.dispose?.();
+  });
+
+  const geometry = new THREE.BoxGeometry(...size);
+  mesh.geometry = geometry;
+  mesh.clear();
+  mesh.add(
+    new THREE.LineSegments(
+      new THREE.EdgesGeometry(geometry),
+      new THREE.LineBasicMaterial({ color: 0x0f172a }),
+    ),
+  );
+  mesh.userData.size = size;
+}
+
 export class PlannerScene {
   private readonly scene = new THREE.Scene();
   private readonly camera: THREE.PerspectiveCamera;
@@ -89,27 +129,44 @@ export class PlannerScene {
   }
 
   renderBoards(boards: Board[], selectedBoardId: string | null): void {
-    for (const mesh of this.boardMeshes.values()) {
-      mesh.geometry.dispose();
-      (mesh.material as THREE.Material).dispose();
+    const nextIds = new Set(boards.map((board) => board.id));
+
+    for (const [id, mesh] of this.boardMeshes.entries()) {
+      if (nextIds.has(id)) continue;
+      if (this.transformControls.object === mesh) {
+        this.transformControls.detach();
+      }
+      disposeBoardMesh(mesh);
+      this.boardGroup.remove(mesh);
+      this.boardMeshes.delete(id);
     }
-    this.boardMeshes.clear();
-    this.boardGroup.clear();
 
     boards.forEach((board) => {
       const [sx, sy, sz] = boardSizeVector(board);
-      const geometry = new THREE.BoxGeometry(sx, sy, sz);
-      const material = createBoardMaterial(board.id === selectedBoardId);
-      const mesh = new THREE.Mesh(geometry, material);
+      let mesh = this.boardMeshes.get(board.id);
+
+      if (!mesh) {
+        const geometry = new THREE.BoxGeometry(sx, sy, sz);
+        const material = createBoardMaterial(board.id === selectedBoardId);
+        mesh = new THREE.Mesh(geometry, material);
+        mesh.userData.boardId = board.id;
+        mesh.userData.size = [sx, sy, sz];
+        const edges = new THREE.LineSegments(
+          new THREE.EdgesGeometry(geometry),
+          new THREE.LineBasicMaterial({ color: 0x0f172a }),
+        );
+        mesh.add(edges);
+        this.boardMeshes.set(board.id, mesh);
+        this.boardGroup.add(mesh);
+      } else {
+        const currentSize = mesh.userData.size as [number, number, number] | undefined;
+        if (!currentSize || currentSize.some((value, index) => Math.abs(value - [sx, sy, sz][index]) > 0.001)) {
+          updateBoardGeometry(mesh, [sx, sy, sz]);
+        }
+        (mesh.material as THREE.MeshStandardMaterial).color.set(board.id === selectedBoardId ? 0xff8a3d : 0x8ab4f8);
+      }
+
       mesh.position.set(board.x_mm, board.y_mm, board.z_mm);
-      mesh.userData.boardId = board.id;
-      const edges = new THREE.LineSegments(
-        new THREE.EdgesGeometry(geometry),
-        new THREE.LineBasicMaterial({ color: 0x0f172a }),
-      );
-      mesh.add(edges);
-      this.boardMeshes.set(board.id, mesh);
-      this.boardGroup.add(mesh);
     });
 
     const selectedMesh = selectedBoardId ? this.boardMeshes.get(selectedBoardId) ?? null : null;
