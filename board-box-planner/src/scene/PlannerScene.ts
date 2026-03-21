@@ -5,6 +5,8 @@ import { boardSizeVector, type Board } from '../domain/model';
 const CAMERA_DISTANCE = 1800;
 const ORIENTATION_GIZMO_RADIUS_PX = 28;
 const TRANSPARENT_BOARD_OPACITY = 0.28;
+const CAMERA_TARGET = new THREE.Vector3(300, 240, 300);
+const PERSPECTIVE_CAMERA_OFFSET = new THREE.Vector3(-CAMERA_DISTANCE * 0.9, CAMERA_DISTANCE * 0.65, -CAMERA_DISTANCE * 0.95);
 type BoardPosition = Pick<Board, 'x_mm' | 'y_mm' | 'z_mm'>;
 type AxisKey = keyof BoardPosition;
 
@@ -154,7 +156,7 @@ export class PlannerScene {
     this.scene.background = new THREE.Color(0x111827);
 
     this.camera = new THREE.PerspectiveCamera(50, 1, 1, 10000);
-    this.camera.position.set(CAMERA_DISTANCE, CAMERA_DISTANCE * 0.8, CAMERA_DISTANCE);
+    this.camera.position.copy(CAMERA_TARGET).add(PERSPECTIVE_CAMERA_OFFSET);
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setPixelRatio(window.devicePixelRatio);
@@ -171,7 +173,7 @@ export class PlannerScene {
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
-    this.controls.target.set(300, 240, 300);
+    this.controls.target.copy(CAMERA_TARGET);
 
     this.scene.add(this.grid);
     this.scene.add(this.axes);
@@ -257,9 +259,11 @@ export class PlannerScene {
     });
   }
 
-  resetCamera(): void { /* unchanged */
-    this.camera.position.set(CAMERA_DISTANCE, CAMERA_DISTANCE * 0.8, CAMERA_DISTANCE);
-    this.controls.target.set(300, 240, 300);
+  resetCamera(): void {
+    this.controls.target.copy(CAMERA_TARGET);
+    this.camera.up.set(0, 1, 0);
+    this.camera.position.copy(CAMERA_TARGET).add(PERSPECTIVE_CAMERA_OFFSET);
+    this.camera.lookAt(this.controls.target);
     this.controls.update();
   }
 
@@ -267,7 +271,7 @@ export class PlannerScene {
     const target = this.controls.target.clone();
     switch (mode) {
       case 'front':
-        this.camera.position.set(target.x, target.y, target.z - CAMERA_DISTANCE);
+        this.camera.position.set(target.x, target.y, target.z + CAMERA_DISTANCE);
         this.camera.up.set(0, 1, 0);
         break;
       case 'top':
