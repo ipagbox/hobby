@@ -67,6 +67,7 @@ function getDefaultCustomConfig(globalThicknessMm: number): CustomBoxConfig {
     backWallMode: 'inside',
     backWallInsetMm: 0,
     doors: { enabled: false, count: 2, verticalGapMm: 2, horizontalGapMm: 2 },
+    dividers: { verticalCount: 0, horizontalCount: 0, frontGapMm: 5 },
   };
 }
 
@@ -132,6 +133,15 @@ function createCustomGenerationModal(config: CustomBoxConfig, errors: Partial<Re
               </div>
             </section>
           ` : ''}
+
+          <section class="modal-section">
+            <h3>Inner dividers</h3>
+            <div class="form-grid compact-grid">
+              <label><span>Vertical count</span><input data-custom-number="verticalDividerCount" type="number" min="0" step="1" value="${config.dividers.verticalCount}" />${fieldError('verticalDividerCount')}</label>
+              <label><span>Horizontal count</span><input data-custom-number="horizontalDividerCount" type="number" min="0" step="1" value="${config.dividers.horizontalCount}" />${fieldError('horizontalDividerCount')}</label>
+              <label><span>Front gap, mm</span><input data-custom-number="frontGapMm" type="number" min="0" step="1" value="${config.dividers.frontGapMm}" />${fieldError('frontGapMm')}</label>
+            </div>
+          </section>
 
           <section class="modal-section">
             <h3>Doors</h3>
@@ -302,6 +312,12 @@ export function createApp(root: HTMLElement): void {
         const value = Number(input.value);
         if (key === 'verticalGapMm' || key === 'horizontalGapMm') {
           customConfig = { ...customConfig, doors: { ...customConfig.doors, [key]: value } };
+        } else if (key === 'verticalDividerCount') {
+          customConfig = { ...customConfig, dividers: { ...customConfig.dividers, verticalCount: value } };
+        } else if (key === 'horizontalDividerCount') {
+          customConfig = { ...customConfig, dividers: { ...customConfig.dividers, horizontalCount: value } };
+        } else if (key === 'frontGapMm') {
+          customConfig = { ...customConfig, dividers: { ...customConfig.dividers, frontGapMm: value } };
         } else {
           customConfig = { ...customConfig, [key]: value } as CustomBoxConfig;
         }

@@ -267,7 +267,7 @@ export class PlannerScene {
     const target = this.controls.target.clone();
     switch (mode) {
       case 'front':
-        this.camera.position.set(target.x, target.y, target.z + CAMERA_DISTANCE);
+        this.camera.position.set(target.x, target.y, target.z - CAMERA_DISTANCE);
         this.camera.up.set(0, 1, 0);
         break;
       case 'top':
