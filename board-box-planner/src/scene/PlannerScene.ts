@@ -3,6 +3,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { boardSizeVector, type Board } from '../domain/model';
 
 const CAMERA_DISTANCE = 1800;
+const ORIENTATION_GIZMO_RADIUS_PX = 28;
 type BoardPosition = Pick<Board, 'x_mm' | 'y_mm' | 'z_mm'>;
 type AxisKey = keyof BoardPosition;
 
@@ -13,6 +14,14 @@ type ActiveAxisDrag = {
   originWorldPosition: any;
   axisScreenDirection: any;
   snapStepMm: number;
+};
+
+type OrientationAxisKey = 'x' | 'y' | 'z';
+
+type OrientationAxisIndicator = {
+  root: HTMLDivElement;
+  line: HTMLDivElement;
+  label: HTMLSpanElement;
 };
 
 function createBoardMaterial(selected: boolean) {
@@ -63,6 +72,23 @@ function updateBoardGeometry(mesh: any, size: [number, number, number]): void {
   mesh.userData.size = size;
 }
 
+function createOrientationAxis(container: HTMLElement, axis: OrientationAxisKey): OrientationAxisIndicator {
+  const root = document.createElement('div');
+  root.className = `orientation-axis orientation-axis-${axis}`;
+
+  const line = document.createElement('div');
+  line.className = 'orientation-axis-line';
+
+  const label = document.createElement('span');
+  label.className = 'orientation-axis-label';
+  label.textContent = axis.toUpperCase();
+
+  root.append(line, label);
+  container.appendChild(root);
+
+  return { root, line, label };
+}
+
 export class PlannerScene {
   private readonly scene = new THREE.Scene();
   private readonly camera: any;
@@ -73,6 +99,8 @@ export class PlannerScene {
   private readonly boardGroup = new THREE.Group();
   private readonly grid = new THREE.GridHelper(2000, 200, 0x666666, 0x333333);
   private readonly axes = new THREE.AxesHelper(250);
+  private readonly orientationGizmo: HTMLDivElement;
+  private readonly orientationIndicators: Record<OrientationAxisKey, OrientationAxisIndicator>;
   private animationFrame = 0;
   private readonly boardMeshes = new Map<string, any>();
   private activeAxisDrag: ActiveAxisDrag | null = null;
@@ -95,6 +123,15 @@ export class PlannerScene {
     this.renderer.setPixelRatio(window.devicePixelRatio);
     container.appendChild(this.renderer.domElement);
 
+    this.orientationGizmo = document.createElement('div');
+    this.orientationGizmo.className = 'orientation-gizmo';
+    this.orientationIndicators = {
+      x: createOrientationAxis(this.orientationGizmo, 'x'),
+      y: createOrientationAxis(this.orientationGizmo, 'y'),
+      z: createOrientationAxis(this.orientationGizmo, 'z'),
+    };
+    container.appendChild(this.orientationGizmo);
+
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
     this.controls.target.set(300, 240, 300);
@@ -113,6 +150,7 @@ export class PlannerScene {
     window.addEventListener('pointerup', this.handleWindowPointerUp);
     window.addEventListener('resize', this.resize);
     this.resize();
+    this.updateOrientationGizmo();
     this.animate();
   }
 
@@ -124,6 +162,7 @@ export class PlannerScene {
     window.removeEventListener('resize', this.resize);
     this.controls.dispose();
     this.renderer.dispose();
+    this.orientationGizmo.remove();
   }
 
   setGridVisible(visible: boolean): void {
@@ -245,6 +284,36 @@ export class PlannerScene {
     );
   }
 
+  private updateOrientationGizmo(): void {
+    const inverseQuaternion = this.camera.quaternion.clone().invert();
+    const axes = {
+      x: { vector: new THREE.Vector3(1, 0, 0), colorVar: '--axis-x-color' },
+      y: { vector: new THREE.Vector3(0, 1, 0), colorVar: '--axis-y-color' },
+      z: { vector: new THREE.Vector3(0, 0, 1), colorVar: '--axis-z-color' },
+    } satisfies Record<OrientationAxisKey, { vector: any; colorVar: string }>;
+
+    (Object.entries(axes) as Array<[OrientationAxisKey, { vector: any; colorVar: string }]>).forEach(([axis, config]) => {
+      const indicator = this.orientationIndicators[axis];
+      const cameraSpaceVector = config.vector.clone().applyQuaternion(inverseQuaternion);
+      const screenVector = new THREE.Vector2(cameraSpaceVector.x, -cameraSpaceVector.y);
+      const screenLength = screenVector.length();
+      const normalized = screenLength > 0.0001 ? screenVector.divideScalar(screenLength) : new THREE.Vector2(1, 0);
+      const length = ORIENTATION_GIZMO_RADIUS_PX * (0.55 + Math.min(screenLength, 1) * 0.45);
+      const endX = normalized.x * length;
+      const endY = normalized.y * length;
+      const depthFactor = (cameraSpaceVector.z + 1) / 2;
+
+      indicator.root.style.transform = `translate(${endX}px, ${endY}px)`;
+      indicator.line.style.transform = `translateY(-50%) rotate(${Math.atan2(endY, endX)}rad)`;
+      indicator.line.style.width = `${length}px`;
+      indicator.root.style.zIndex = `${Math.round(depthFactor * 100)}`;
+      indicator.root.style.opacity = `${0.45 + (1 - depthFactor) * 0.55}`;
+      indicator.label.style.boxShadow = cameraSpaceVector.z < 0
+        ? '0 0 0 2px rgba(15, 23, 42, 0.92)'
+        : '0 0 0 1px rgba(15, 23, 42, 0.55)';
+    });
+  }
+
   private handleWindowPointerMove = (event: PointerEvent): void => {
     if (!this.activeAxisDrag) return;
     const drag = this.activeAxisDrag;
@@ -296,6 +365,7 @@ export class PlannerScene {
   private animate = (): void => {
     this.animationFrame = requestAnimationFrame(this.animate);
     this.controls.update();
+    this.updateOrientationGizmo();
     this.renderer.render(this.scene, this.camera);
   };
 }
