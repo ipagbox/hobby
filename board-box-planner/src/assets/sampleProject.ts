@@ -4,7 +4,8 @@ export const sampleProjectJson = `{
   "settings": {
     "gridVisible": true,
     "snapEnabled": true,
-    "snapStepMm": 10
+    "snapStepMm": 10,
+    "transparencyEnabled": false
   },
   "boards": [
     {

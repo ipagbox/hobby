@@ -18,6 +18,7 @@ export interface AppSettings {
   gridVisible: boolean;
   snapEnabled: boolean;
   snapStepMm: (typeof SNAP_STEPS_MM)[number];
+  transparencyEnabled: boolean;
 }
 
 export interface Board {
@@ -87,6 +88,7 @@ export function createEmptyProject(): Project {
       gridVisible: true,
       snapEnabled: true,
       snapStepMm: 10,
+      transparencyEnabled: false,
     },
   };
 }
@@ -124,6 +126,7 @@ export function projectFromJson(raw: string): Project {
       snapStepMm: SNAP_STEPS_MM.includes(parsed.settings?.snapStepMm as (typeof SNAP_STEPS_MM)[number])
         ? (parsed.settings?.snapStepMm as (typeof SNAP_STEPS_MM)[number])
         : 10,
+      transparencyEnabled: parsed.settings?.transparencyEnabled ?? false,
     },
   };
 }

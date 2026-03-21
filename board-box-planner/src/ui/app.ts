@@ -197,6 +197,7 @@ export function createApp(root: HTMLElement): void {
               <span>Step</span>
               <select data-action="snap-step"></select>
             </label>
+            <label class="toggle-chip"><input data-action="toggle-transparency" type="checkbox" /><span>Transparency</span></label>
           </div>
         </div>
       </header>
@@ -247,10 +248,11 @@ export function createApp(root: HTMLElement): void {
   const gridToggle = root.querySelector<HTMLInputElement>('[data-action="toggle-grid"]');
   const snapToggle = root.querySelector<HTMLInputElement>('[data-action="toggle-snap"]');
   const snapSelect = root.querySelector<HTMLSelectElement>('[data-action="snap-step"]');
+  const transparencyToggle = root.querySelector<HTMLInputElement>('[data-action="toggle-transparency"]');
   const loadInput = root.querySelector<HTMLInputElement>('[data-action="load"]');
   const modalRoot = root.querySelector<HTMLElement>('[data-modal-root]');
 
-  if (!viewport || !boardList || !propertiesPanel || !projectNameInput || !projectThicknessInput || !gridToggle || !snapToggle || !snapSelect || !loadInput || !modalRoot) {
+  if (!viewport || !boardList || !propertiesPanel || !projectNameInput || !projectThicknessInput || !gridToggle || !snapToggle || !snapSelect || !transparencyToggle || !loadInput || !modalRoot) {
     throw new Error('App UI failed to initialize');
   }
 
@@ -404,6 +406,11 @@ export function createApp(root: HTMLElement): void {
     store.updateProject({ settings: { ...current, snapStepMm: Number(snapSelect.value) as 1 | 5 | 10 } });
   });
 
+  transparencyToggle.addEventListener('change', () => {
+    const current = store.getState().project.settings;
+    store.updateProject({ settings: { ...current, transparencyEnabled: transparencyToggle.checked } });
+  });
+
   projectNameInput.addEventListener('change', () => store.updateProject({ name: projectNameInput.value }));
   projectThicknessInput.addEventListener('change', () => {
     const value = Number(projectThicknessInput.value);
@@ -507,9 +514,11 @@ export function createApp(root: HTMLElement): void {
     snapToggle.checked = state.project.settings.snapEnabled;
     snapSelect.value = String(state.project.settings.snapStepMm);
     snapSelect.disabled = !state.project.settings.snapEnabled;
+    transparencyToggle.checked = state.project.settings.transparencyEnabled;
     renderBoardList(state);
     renderProperties(state.project.boards.find((board) => board.id === state.selectedBoardId));
     scene.setGridVisible(state.project.settings.gridVisible);
+    scene.setTransparencyEnabled(state.project.settings.transparencyEnabled);
     scene.renderBoards(state.project.boards, state.selectedBoardId);
   });
   window.addEventListener('beforeunload', () => scene.dispose(), { once: true });
