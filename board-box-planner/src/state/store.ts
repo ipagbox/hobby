@@ -58,8 +58,10 @@ function getSnappedPosition(project: Project, boardId: string, partial: Partial<
   if (!board) return partial;
   const draft = { ...board, ...partial };
   const others = project.boards.filter((item) => item.id !== boardId);
-  const threshold = project.settings.snapStepMm;
+  const threshold = project.settings.snapEnabled ? project.settings.snapStepMm : 0;
   const nextPosition: Partial<BoardPosition> = { ...partial };
+
+  if (!project.settings.snapEnabled) return nextPosition;
 
   for (const axis of POSITION_AXES) {
     if (partial[axis] === undefined) continue;

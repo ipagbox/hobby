@@ -16,6 +16,7 @@ export type BoardRole =
 
 export interface AppSettings {
   gridVisible: boolean;
+  snapEnabled: boolean;
   snapStepMm: (typeof SNAP_STEPS_MM)[number];
 }
 
@@ -84,6 +85,7 @@ export function createEmptyProject(): Project {
     boards: [createBoard({ name: 'Side panel', role: 'side', orientation: 'YZ', x_mm: 0, y_mm: 300, z_mm: 200 })],
     settings: {
       gridVisible: true,
+      snapEnabled: true,
       snapStepMm: 10,
     },
   };
@@ -118,6 +120,7 @@ export function projectFromJson(raw: string): Project {
     ),
     settings: {
       gridVisible: parsed.settings?.gridVisible ?? true,
+      snapEnabled: parsed.settings?.snapEnabled ?? true,
       snapStepMm: SNAP_STEPS_MM.includes(parsed.settings?.snapStepMm as (typeof SNAP_STEPS_MM)[number])
         ? (parsed.settings?.snapStepMm as (typeof SNAP_STEPS_MM)[number])
         : 10,

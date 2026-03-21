@@ -14,6 +14,29 @@ const AXIS_BUTTONS: Array<{ axis: 'x_mm' | 'y_mm' | 'z_mm'; label: string; color
   { axis: 'z_mm', label: 'Z', colorClass: 'axis-z' },
 ];
 
+const TOOLBAR_ICONS = {
+  newProject: '📁',
+  save: '💾',
+  load: '📂',
+  newBoard: '🪵',
+  duplicate: '⧉',
+  delete: '🗑',
+  customGeneration: '✨',
+  front: 'F',
+  top: 'T',
+  left: 'L',
+  right: 'R',
+  perspective: '3D',
+} as const;
+
+function iconButton(label: string, icon: string, attributes: string): string {
+  return `<button class="icon-button" type="button" ${attributes} title="${label}" aria-label="${label}"><span class="icon-glyph" aria-hidden="true">${icon}</span></button>`;
+}
+
+function iconFileButton(label: string, icon: string, action: string): string {
+  return `<label class="icon-button file-button" title="${label}" aria-label="${label}"><span class="icon-glyph" aria-hidden="true">${icon}</span><input data-action="${action}" type="file" accept="application/json" hidden /></label>`;
+}
+
 function mmInput(label: string, value: number): string {
   return `<label><span>${label}</span><input data-number-input="${label}" type="number" value="${value}" step="1" /></label>`;
 }
@@ -130,31 +153,51 @@ export function createApp(root: HTMLElement): void {
   root.innerHTML = `
     <div class="app-shell">
       <header class="toolbar">
-        <div class="toolbar-group">
-          <button data-action="new-project">New project</button>
-          <button data-action="new-board">New board</button>
-          <button data-action="duplicate">Duplicate</button>
-          <button data-action="delete">Delete</button>
+        <div class="toolbar-section">
+          <span class="toolbar-section-title">Project</span>
+          <div class="toolbar-group">
+            ${iconButton('New project', TOOLBAR_ICONS.newProject, 'data-action="new-project"')}
+            ${iconButton('Save project', TOOLBAR_ICONS.save, 'data-action="save"')}
+            ${iconFileButton('Load project', TOOLBAR_ICONS.load, 'load')}
+          </div>
         </div>
-        <div class="toolbar-group">
-          <button data-action="save">Save project</button>
-          <label class="file-button">Load project<input data-action="load" type="file" accept="application/json" hidden /></label>
-          <button data-action="custom-generation">Custom Generation</button>
+        <div class="toolbar-section">
+          <span class="toolbar-section-title">Boards</span>
+          <div class="toolbar-group">
+            ${iconButton('New board', TOOLBAR_ICONS.newBoard, 'data-action="new-board"')}
+            ${iconButton('Duplicate board', TOOLBAR_ICONS.duplicate, 'data-action="duplicate"')}
+            ${iconButton('Delete board', TOOLBAR_ICONS.delete, 'data-action="delete"')}
+          </div>
         </div>
-        <div class="toolbar-group">
-          <button data-action="reset-camera">Reset camera</button>
-          <button data-view="front">Front</button>
-          <button data-view="top">Top</button>
-          <button data-view="left">Left</button>
-          <button data-view="right">Right</button>
-          <button data-view="perspective">Perspective</button>
+        <div class="toolbar-section">
+          <span class="toolbar-section-title">Generate</span>
+          <div class="toolbar-group">
+            <button class="toolbar-pill" type="button" data-action="custom-generation">
+              <span class="icon-glyph" aria-hidden="true">${TOOLBAR_ICONS.customGeneration}</span>
+              <span>Custom generation</span>
+            </button>
+          </div>
         </div>
-        <div class="toolbar-group compact">
-          <label><span>Grid</span><input data-action="toggle-grid" type="checkbox" /></label>
-          <label>
-            <span>Snap</span>
-            <select data-action="snap-step"></select>
-          </label>
+        <div class="toolbar-section">
+          <span class="toolbar-section-title">View</span>
+          <div class="toolbar-group">
+            ${iconButton('Front view', TOOLBAR_ICONS.front, 'data-view="front"')}
+            ${iconButton('Top view', TOOLBAR_ICONS.top, 'data-view="top"')}
+            ${iconButton('Left view', TOOLBAR_ICONS.left, 'data-view="left"')}
+            ${iconButton('Right view', TOOLBAR_ICONS.right, 'data-view="right"')}
+            ${iconButton('Perspective view', TOOLBAR_ICONS.perspective, 'data-view="perspective"')}
+          </div>
+        </div>
+        <div class="toolbar-section toolbar-section-controls">
+          <span class="toolbar-section-title">Helpers</span>
+          <div class="toolbar-group compact toggle-group">
+            <label class="toggle-chip"><input data-action="toggle-grid" type="checkbox" /><span>Grid</span></label>
+            <label class="toggle-chip"><input data-action="toggle-snap" type="checkbox" /><span>Snap</span></label>
+            <label class="select-chip">
+              <span>Step</span>
+              <select data-action="snap-step"></select>
+            </label>
+          </div>
         </div>
       </header>
       <main class="layout">
@@ -202,11 +245,12 @@ export function createApp(root: HTMLElement): void {
   const projectNameInput = root.querySelector<HTMLInputElement>('[data-project-name]');
   const projectThicknessInput = root.querySelector<HTMLInputElement>('[data-project-thickness]');
   const gridToggle = root.querySelector<HTMLInputElement>('[data-action="toggle-grid"]');
+  const snapToggle = root.querySelector<HTMLInputElement>('[data-action="toggle-snap"]');
   const snapSelect = root.querySelector<HTMLSelectElement>('[data-action="snap-step"]');
   const loadInput = root.querySelector<HTMLInputElement>('[data-action="load"]');
   const modalRoot = root.querySelector<HTMLElement>('[data-modal-root]');
 
-  if (!viewport || !boardList || !propertiesPanel || !projectNameInput || !projectThicknessInput || !gridToggle || !snapSelect || !loadInput || !modalRoot) {
+  if (!viewport || !boardList || !propertiesPanel || !projectNameInput || !projectThicknessInput || !gridToggle || !snapToggle || !snapSelect || !loadInput || !modalRoot) {
     throw new Error('App UI failed to initialize');
   }
 
@@ -311,9 +355,6 @@ export function createApp(root: HTMLElement): void {
         case 'save':
           store.saveToFile();
           break;
-        case 'reset-camera':
-          scene.resetCamera();
-          break;
         case 'custom-generation':
           customConfig = {
             ...customConfig,
@@ -351,6 +392,11 @@ export function createApp(root: HTMLElement): void {
   gridToggle.addEventListener('change', () => {
     const current = store.getState().project.settings;
     store.updateProject({ settings: { ...current, gridVisible: gridToggle.checked } });
+  });
+
+  snapToggle.addEventListener('change', () => {
+    const current = store.getState().project.settings;
+    store.updateProject({ settings: { ...current, snapEnabled: snapToggle.checked } });
   });
 
   snapSelect.addEventListener('change', () => {
@@ -458,7 +504,9 @@ export function createApp(root: HTMLElement): void {
     projectNameInput.value = state.project.name;
     projectThicknessInput.value = String(state.project.board_thickness_mm);
     gridToggle.checked = state.project.settings.gridVisible;
+    snapToggle.checked = state.project.settings.snapEnabled;
     snapSelect.value = String(state.project.settings.snapStepMm);
+    snapSelect.disabled = !state.project.settings.snapEnabled;
     renderBoardList(state);
     renderProperties(state.project.boards.find((board) => board.id === state.selectedBoardId));
     scene.setGridVisible(state.project.settings.gridVisible);

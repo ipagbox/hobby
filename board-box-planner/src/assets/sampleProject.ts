@@ -3,6 +3,7 @@ export const sampleProjectJson = `{
   "board_thickness_mm": 16,
   "settings": {
     "gridVisible": true,
+    "snapEnabled": true,
     "snapStepMm": 10
   },
   "boards": [
