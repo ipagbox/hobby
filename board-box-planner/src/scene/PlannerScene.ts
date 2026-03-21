@@ -4,6 +4,7 @@ import { boardSizeVector, type Board } from '../domain/model';
 
 const CAMERA_DISTANCE = 1800;
 const ORIENTATION_GIZMO_RADIUS_PX = 28;
+const TRANSPARENT_BOARD_OPACITY = 0.28;
 type BoardPosition = Pick<Board, 'x_mm' | 'y_mm' | 'z_mm'>;
 type AxisKey = keyof BoardPosition;
 
@@ -24,12 +25,35 @@ type OrientationAxisIndicator = {
   label: HTMLSpanElement;
 };
 
-function createBoardMaterial(selected: boolean) {
+function createBoardMaterial(selected: boolean, transparencyEnabled: boolean) {
   return new THREE.MeshStandardMaterial({
     color: selected ? 0xff8a3d : 0x8ab4f8,
     roughness: 0.85,
     metalness: 0.05,
+    transparent: transparencyEnabled,
+    opacity: transparencyEnabled ? TRANSPARENT_BOARD_OPACITY : 1,
+    depthWrite: !transparencyEnabled,
   });
+}
+
+function createBoardEdges(geometry: any, transparencyEnabled: boolean): any {
+  const edgesGeometry = new THREE.EdgesGeometry(geometry);
+  const edgesMaterial = transparencyEnabled
+    ? new THREE.LineDashedMaterial({
+        color: 0xe2e8f0,
+        dashSize: 14,
+        gapSize: 8,
+        transparent: true,
+        opacity: 0.9,
+        depthTest: false,
+      })
+    : new THREE.LineBasicMaterial({ color: 0x0f172a });
+  const edges = new THREE.LineSegments(edgesGeometry, edgesMaterial);
+  if (transparencyEnabled) {
+    edges.computeLineDistances();
+    edges.renderOrder = 10;
+  }
+  return edges;
 }
 
 function disposeBoardMesh(mesh: any): void {
@@ -52,7 +76,7 @@ function disposeBoardMesh(mesh: any): void {
   });
 }
 
-function updateBoardGeometry(mesh: any, size: [number, number, number]): void {
+function updateBoardGeometry(mesh: any, size: [number, number, number], transparencyEnabled: boolean): void {
   mesh.geometry.dispose();
   mesh.children.forEach((child: any) => {
     const line = child as any;
@@ -63,13 +87,25 @@ function updateBoardGeometry(mesh: any, size: [number, number, number]): void {
   const geometry = new THREE.BoxGeometry(...size);
   mesh.geometry = geometry;
   mesh.clear();
-  mesh.add(
-    new THREE.LineSegments(
-      new THREE.EdgesGeometry(geometry),
-      new THREE.LineBasicMaterial({ color: 0x0f172a }),
-    ),
-  );
+  mesh.add(createBoardEdges(geometry, transparencyEnabled));
   mesh.userData.size = size;
+}
+
+function updateBoardAppearance(mesh: any, selected: boolean, transparencyEnabled: boolean): void {
+  const material = mesh.material as any;
+  material.color.set(selected ? 0xff8a3d : 0x8ab4f8);
+  material.transparent = transparencyEnabled;
+  material.opacity = transparencyEnabled ? TRANSPARENT_BOARD_OPACITY : 1;
+  material.depthWrite = !transparencyEnabled;
+  material.needsUpdate = true;
+
+  mesh.children.forEach((child: any) => {
+    const line = child as any;
+    line.geometry?.dispose?.();
+    line.material?.dispose?.();
+  });
+  mesh.clear();
+  mesh.add(createBoardEdges(mesh.geometry as any, transparencyEnabled));
 }
 
 function createOrientationAxis(container: HTMLElement, axis: OrientationAxisKey): OrientationAxisIndicator {
@@ -104,6 +140,7 @@ export class PlannerScene {
   private animationFrame = 0;
   private readonly boardMeshes = new Map<string, any>();
   private activeAxisDrag: ActiveAxisDrag | null = null;
+  private transparencyEnabled = false;
   private onBoardSelected: (id: string | null) => void;
   private onBoardMoved: (id: string, position: Partial<BoardPosition>) => void;
 
@@ -169,6 +206,14 @@ export class PlannerScene {
     this.grid.visible = visible;
   }
 
+  setTransparencyEnabled(enabled: boolean): void {
+    if (this.transparencyEnabled === enabled) return;
+    this.transparencyEnabled = enabled;
+    this.boardMeshes.forEach((mesh) => {
+      updateBoardAppearance(mesh as any, (mesh.userData.isSelected as boolean) ?? false, this.transparencyEnabled);
+    });
+  }
+
   renderBoards(boards: Board[], selectedBoardId: string | null): void {
     const nextIds = new Set(boards.map((board) => board.id));
 
@@ -181,35 +226,38 @@ export class PlannerScene {
     }
 
     boards.forEach((board) => {
-      const [sx, sy, sz] = boardSizeVector(board);
+      const size: [number, number, number] = boardSizeVector(board);
+      const isSelected = board.id === selectedBoardId;
       let mesh = this.boardMeshes.get(board.id);
 
       if (!mesh) {
-        const geometry = new THREE.BoxGeometry(sx, sy, sz);
-        const material = createBoardMaterial(board.id === selectedBoardId);
+        const geometry = new THREE.BoxGeometry(...size);
+        const material = createBoardMaterial(isSelected, this.transparencyEnabled);
         mesh = new THREE.Mesh(geometry, material);
         mesh.userData.boardId = board.id;
-        mesh.userData.size = [sx, sy, sz];
-        const edges = new THREE.LineSegments(
-          new THREE.EdgesGeometry(geometry),
-          new THREE.LineBasicMaterial({ color: 0x0f172a }),
-        );
-        mesh.add(edges);
+        mesh.userData.size = size;
+        mesh.userData.isSelected = isSelected;
+        mesh.add(createBoardEdges(geometry, this.transparencyEnabled));
         this.boardMeshes.set(board.id, mesh);
         this.boardGroup.add(mesh);
       } else {
         const currentSize = mesh.userData.size as [number, number, number] | undefined;
-        if (!currentSize || currentSize.some((value, index) => Math.abs(value - [sx, sy, sz][index]) > 0.001)) {
-          updateBoardGeometry(mesh, [sx, sy, sz]);
+        if (!currentSize || currentSize.some((value, index) => Math.abs(value - size[index]) > 0.001)) {
+          updateBoardGeometry(mesh, size, this.transparencyEnabled);
         }
-        (mesh.material as any).color.set(board.id === selectedBoardId ? 0xff8a3d : 0x8ab4f8);
+        if (mesh.userData.isSelected !== isSelected || mesh.userData.transparencyEnabled !== this.transparencyEnabled) {
+          updateBoardAppearance(mesh, isSelected, this.transparencyEnabled);
+        }
+        mesh.userData.size = size;
       }
 
+      mesh.userData.isSelected = isSelected;
+      mesh.userData.transparencyEnabled = this.transparencyEnabled;
       mesh.position.set(board.x_mm, board.y_mm, board.z_mm);
     });
   }
 
-  resetCamera(): void {
+  resetCamera(): void { /* unchanged */
     this.camera.position.set(CAMERA_DISTANCE, CAMERA_DISTANCE * 0.8, CAMERA_DISTANCE);
     this.controls.target.set(300, 240, 300);
     this.controls.update();
@@ -292,7 +340,7 @@ export class PlannerScene {
       z: { vector: new THREE.Vector3(0, 0, 1), colorVar: '--axis-z-color' },
     } satisfies Record<OrientationAxisKey, { vector: any; colorVar: string }>;
 
-    (Object.entries(axes) as Array<[OrientationAxisKey, { vector: any; colorVar: string }]>).forEach(([axis, config]) => {
+    (Object.entries(axes) as Array<[OrientationAxisKey, { vector: any; colorVar: string }]>) .forEach(([axis, config]) => {
       const indicator = this.orientationIndicators[axis];
       const cameraSpaceVector = config.vector.clone().applyQuaternion(inverseQuaternion);
       const screenVector = new THREE.Vector2(cameraSpaceVector.x, -cameraSpaceVector.y);
