@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "./dist-tests",
+    "rootDir": "./src",
+    "module": "CommonJS",
+    "moduleResolution": "Node"
+  },
+  "include": ["src/features/cut-layout/**/*.ts", "src/domain/model.ts", "src/assets/sampleProject.ts"],
+  "exclude": ["src/features/cut-layout/tests/run-tests.ts"]
+}

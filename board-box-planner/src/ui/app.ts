@@ -7,6 +7,11 @@ import {
 } from '../domain/customBox';
 import { PlannerScene } from '../scene/PlannerScene';
 import { PlannerStore, type AppState } from '../state/store';
+import { renderCutBoardList, renderCutProperties, renderCutWorkspace, renderViewModeToggle } from '../features/cut-layout/components/cutMode';
+import { createDefaultCutLayoutSettings } from '../features/cut-layout/domain/defaults';
+import { extractCutParts } from '../features/cut-layout/domain/extractParts';
+import { PACKERS, resolveSelectedGroup } from '../features/cut-layout/domain/layoutUtils';
+import type { CutLayoutResult, CutLayoutSettings, ViewMode } from '../features/cut-layout/domain/types';
 
 const AXIS_BUTTONS: Array<{ axis: 'x_mm' | 'y_mm' | 'z_mm'; label: string; colorClass: string }> = [
   { axis: 'x_mm', label: 'X', colorClass: 'axis-x' },
@@ -167,6 +172,11 @@ function createCustomGenerationModal(config: CustomBoxConfig, errors: Partial<Re
 export function createApp(root: HTMLElement): void {
   const store = new PlannerStore();
   let customConfig = getDefaultCustomConfig(store.getState().project.board_thickness_mm);
+  let viewMode: ViewMode = 'project';
+  let cutSettings: CutLayoutSettings = createDefaultCutLayoutSettings();
+  let cutResult: CutLayoutResult = PACKERS[cutSettings.selectedAlgorithm](null, cutSettings);
+  let cutActiveSheetIndex = 0;
+  let cutZoom = 1;
 
   root.innerHTML = `
     <div class="app-shell">
@@ -201,9 +211,11 @@ export function createApp(root: HTMLElement): void {
               ${VIEW_ACTIONS.map(({ view, icon, label }) => createViewButton(view, icon, label)).join('')}
             </div>
           </div>
+
+          ${renderViewModeToggle(viewMode)}
         </div>
 
-        <div class="toolbar-group toolbar-group--settings compact">
+        <div class="toolbar-group toolbar-group--settings compact project-only-toolbar">
           <label class="toolbar-toggle">
             <input data-action="toggle-grid" type="checkbox" />
             <span>Grid</span>
@@ -220,8 +232,8 @@ export function createApp(root: HTMLElement): void {
       </header>
       <main class="layout">
         <aside class="panel object-list-panel">
-          <div class="panel-header"><h2>Boards</h2></div>
-          <div class="project-meta">
+          <div class="panel-header"><h2 data-sidebar-title>Boards</h2></div>
+          <div class="project-meta" data-project-meta>
             <label>
               <span>Project name</span>
               <input data-project-name type="text" />
@@ -233,9 +245,10 @@ export function createApp(root: HTMLElement): void {
           </div>
           <div class="board-list" data-board-list></div>
         </aside>
-        <section class="viewport-panel panel">
+        <section class="viewport-panel panel" data-workspace-panel>
           <div class="viewport" data-viewport></div>
-          <div class="viewport-toggles">
+          <div class="cut-workspace" data-cut-workspace hidden></div>
+          <div class="viewport-toggles project-only-panel">
             <label class="viewport-toggle">
               <input data-action="toggle-transparency" type="checkbox" />
               <span>Transparency</span>
@@ -249,7 +262,7 @@ export function createApp(root: HTMLElement): void {
               <span>Open Doors</span>
             </label>
           </div>
-          <div class="move-pad">
+          <div class="move-pad project-only-panel">
             <span>Move selected</span>
             <div class="move-pad-grid">
               ${AXIS_BUTTONS.map(
@@ -272,8 +285,11 @@ export function createApp(root: HTMLElement): void {
   `;
 
   const viewport = root.querySelector<HTMLElement>('[data-viewport]');
+  const cutWorkspace = root.querySelector<HTMLElement>('[data-cut-workspace]');
   const boardList = root.querySelector<HTMLElement>('[data-board-list]');
   const propertiesPanel = root.querySelector<HTMLElement>('[data-properties-panel]');
+  const projectMeta = root.querySelector<HTMLElement>('[data-project-meta]');
+  const sidebarTitle = root.querySelector<HTMLElement>('[data-sidebar-title]');
   const projectNameInput = root.querySelector<HTMLInputElement>('[data-project-name]');
   const projectThicknessInput = root.querySelector<HTMLInputElement>('[data-project-thickness]');
   const gridToggle = root.querySelector<HTMLInputElement>('[data-action="toggle-grid"]');
@@ -284,8 +300,9 @@ export function createApp(root: HTMLElement): void {
   const hideDoorsToggle = root.querySelector<HTMLInputElement>('[data-action="toggle-hide-doors"]');
   const openDoorsToggle = root.querySelector<HTMLInputElement>('[data-action="toggle-open-doors"]');
   const modalRoot = root.querySelector<HTMLElement>('[data-modal-root]');
+  const layoutRoot = root.querySelector<HTMLElement>('.layout');
 
-  if (!viewport || !boardList || !propertiesPanel || !projectNameInput || !projectThicknessInput || !gridToggle || !snapToggle || !snapSelect || !loadInput || !transparencyToggle || !hideDoorsToggle || !openDoorsToggle || !modalRoot) {
+  if (!viewport || !cutWorkspace || !boardList || !propertiesPanel || !projectMeta || !sidebarTitle || !projectNameInput || !projectThicknessInput || !gridToggle || !snapToggle || !snapSelect || !loadInput || !transparencyToggle || !hideDoorsToggle || !openDoorsToggle || !modalRoot || !layoutRoot) {
     throw new Error('App UI failed to initialize');
   }
 
@@ -296,6 +313,16 @@ export function createApp(root: HTMLElement): void {
     (id) => store.setSelectedBoard(id),
     (id, position) => store.moveBoardToPosition(id, position),
   );
+
+  const recalculateCutLayout = (state: AppState): void => {
+    const extraction = extractCutParts(state.project);
+    const selectedGroup = resolveSelectedGroup(extraction.groups, cutSettings.selectedGroupId);
+    if (selectedGroup && cutSettings.selectedGroupId !== selectedGroup.id) {
+      cutSettings = { ...cutSettings, selectedGroupId: selectedGroup.id };
+    }
+    cutResult = PACKERS[cutSettings.selectedAlgorithm](selectedGroup, cutSettings);
+    cutActiveSheetIndex = Math.min(cutActiveSheetIndex, Math.max(cutResult.sheets.length - 1, 0));
+  };
 
   const renderCustomModal = (): void => {
     const previousScrollTop = modalRoot.querySelector<HTMLElement>('.modal-body')?.scrollTop ?? 0;
@@ -337,7 +364,6 @@ export function createApp(root: HTMLElement): void {
         applyCustomNumberValue(input.dataset.customNumber as string, input.value);
         renderCustomModal();
       });
-
       input.addEventListener('keydown', (event) => {
         if (event.key !== 'Enter') return;
         applyCustomNumberValue(input.dataset.customNumber as string, input.value);
@@ -373,7 +399,6 @@ export function createApp(root: HTMLElement): void {
       renderCustomModal();
     });
 
-
     modal.querySelector<HTMLButtonElement>('[data-custom-confirm]')?.addEventListener('click', () => {
       const latestValidation = validateCustomBoxConfig(customConfig);
       if (!latestValidation.isValid) {
@@ -382,6 +407,200 @@ export function createApp(root: HTMLElement): void {
       }
       store.generateCustomBox(customConfig);
       modalRoot.innerHTML = '';
+    });
+  };
+
+  const renderProperties = (board: Board | undefined): void => {
+    if (viewMode === 'cut') {
+      const extraction = extractCutParts(store.getState().project);
+      propertiesPanel.innerHTML = renderCutProperties(cutSettings, extraction.groups, cutSettings.selectedGroupId, cutResult);
+
+      propertiesPanel.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-cut-setting]').forEach((field) => {
+        const key = field.dataset.cutSetting as keyof CutLayoutSettings;
+        const applyValue = (): void => {
+          const nextValue = field instanceof HTMLInputElement && field.type === 'checkbox' ? field.checked : field.value;
+          cutSettings = {
+            ...cutSettings,
+            [key]: typeof cutSettings[key] === 'number' ? Number(nextValue) : nextValue,
+          } as CutLayoutSettings;
+          if (key === 'selectedGroupId') {
+            cutActiveSheetIndex = 0;
+          }
+          if (cutSettings.autoRecalculate) {
+            recalculateCutLayout(store.getState());
+            renderApp(store.getState());
+          }
+        };
+        field.addEventListener('change', applyValue);
+      });
+
+      propertiesPanel.querySelector<HTMLButtonElement>('[data-cut-action="recalculate"]')?.addEventListener('click', () => {
+        recalculateCutLayout(store.getState());
+        renderApp(store.getState());
+      });
+      return;
+    }
+
+    if (!board) {
+      propertiesPanel.innerHTML = '<div class="panel-header"><h2>Properties</h2></div><p class="empty-state">Select a board to edit its properties.</p>';
+      return;
+    }
+
+    propertiesPanel.innerHTML = `
+      <div class="panel-header"><h2>Properties</h2></div>
+      <div class="form-grid">
+        <label><span>Name</span><input data-field="name" type="text" value="${board.name}" /></label>
+        <label><span>Role</span><select data-field="role">${ROLE_OPTIONS.map((role) => `<option value="${role}" ${board.role === role ? 'selected' : ''}>${role}</option>`).join('')}</select></label>
+        <label><span>Material</span><input data-field="material" type="text" value="${board.material}" /></label>
+        ${mmInput('width_mm', board.width_mm)}
+        ${mmInput('height_mm', board.height_mm)}
+        ${mmInput('thickness_mm', board.thickness_mm)}
+        ${mmInput('x_mm', board.x_mm)}
+        ${mmInput('y_mm', board.y_mm)}
+        ${mmInput('z_mm', board.z_mm)}
+        <label><span>Orientation</span><select data-field="orientation">${ORIENTATION_OPTIONS.map((orientation) => `<option value="${orientation}" ${board.orientation === orientation ? 'selected' : ''}>${orientation}</option>`).join('')}</select></label>
+        <label class="full-width"><span>Note</span><textarea data-field="note" rows="4">${board.note}</textarea></label>
+      </div>
+    `;
+
+    propertiesPanel.querySelectorAll<HTMLInputElement>('[data-number-input]').forEach((input) => {
+      input.addEventListener('change', () => {
+        const field = input.dataset.numberInput as keyof Board;
+        const value = Number(input.value);
+        if (field === 'x_mm' || field === 'y_mm' || field === 'z_mm') {
+          store.moveBoardToPosition(board.id, { [field]: value } as Partial<Pick<Board, 'x_mm' | 'y_mm' | 'z_mm'>>);
+          return;
+        }
+        store.updateBoard(board.id, { [field]: value } as Partial<Board>);
+      });
+    });
+
+    propertiesPanel.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>('[data-field]').forEach((field) => {
+      field.addEventListener('change', () => {
+        const key = field.dataset.field as keyof Board;
+        const value = field.value;
+        if (key === 'orientation') {
+          store.setOrientation(board.id, value as Board['orientation']);
+          return;
+        }
+        store.updateBoard(board.id, { [key]: value } as Partial<Board>);
+      });
+    });
+  };
+
+  const renderBoardList = (state: AppState): void => {
+    if (viewMode === 'cut') {
+      const extraction = extractCutParts(state.project);
+      const selectedGroup = resolveSelectedGroup(extraction.groups, cutSettings.selectedGroupId);
+      boardList.innerHTML = renderCutBoardList(selectedGroup, cutResult, state.selectedBoardId);
+      boardList.querySelectorAll<HTMLElement>('[data-cut-part-id]').forEach((element) => {
+        element.addEventListener('click', () => store.setSelectedBoard(element.dataset.cutPartId ?? null));
+      });
+      return;
+    }
+
+    boardList.innerHTML = state.project.boards
+      .map(
+        (board) => `
+          <button class="board-row ${board.id === state.selectedBoardId ? 'selected' : ''}" data-board-id="${board.id}">
+            <strong contenteditable="true" data-board-name="${board.id}">${board.name}</strong>
+            <span>${board.role}</span>
+            <small>${board.width_mm} × ${board.height_mm} × ${board.thickness_mm} mm</small>
+          </button>
+        `,
+      )
+      .join('');
+
+    boardList.querySelectorAll<HTMLElement>('[data-board-id]').forEach((element) => {
+      element.addEventListener('click', () => store.setSelectedBoard(element.dataset.boardId ?? null));
+    });
+
+    boardList.querySelectorAll<HTMLElement>('[data-board-name]').forEach((element) => {
+      element.addEventListener('blur', () => {
+        const id = element.dataset.boardName;
+        if (id) {
+          store.updateBoard(id, { name: element.textContent?.trim() || 'Board' });
+        }
+      });
+    });
+  };
+
+  const renderCutWorkspacePanel = (state: AppState): void => {
+    if (viewMode !== 'cut') return;
+    cutWorkspace.hidden = false;
+    viewport.hidden = true;
+    cutWorkspace.innerHTML = renderCutWorkspace(cutResult, cutActiveSheetIndex, state.selectedBoardId, cutZoom);
+    cutWorkspace.querySelectorAll<HTMLElement>('[data-cut-part-id], [data-cut-canvas-part-id]').forEach((element) => {
+      const id = element.dataset.cutPartId ?? element.dataset.cutCanvasPartId;
+      element.addEventListener('click', () => store.setSelectedBoard(id ?? null));
+    });
+    cutWorkspace.querySelector<HTMLButtonElement>('[data-cut-action="prev-sheet"]')?.addEventListener('click', () => {
+      cutActiveSheetIndex = Math.max(cutActiveSheetIndex - 1, 0);
+      renderApp(store.getState());
+    });
+    cutWorkspace.querySelector<HTMLButtonElement>('[data-cut-action="next-sheet"]')?.addEventListener('click', () => {
+      cutActiveSheetIndex = Math.min(cutActiveSheetIndex + 1, Math.max(cutResult.sheets.length - 1, 0));
+      renderApp(store.getState());
+    });
+    cutWorkspace.querySelector<HTMLButtonElement>('[data-cut-action="zoom-in"]')?.addEventListener('click', () => {
+      cutZoom = Math.min(cutZoom + 0.15, 2.5);
+      renderApp(store.getState());
+    });
+    cutWorkspace.querySelector<HTMLButtonElement>('[data-cut-action="zoom-out"]')?.addEventListener('click', () => {
+      cutZoom = Math.max(cutZoom - 0.15, 0.4);
+      renderApp(store.getState());
+    });
+    cutWorkspace.querySelector<HTMLButtonElement>('[data-cut-action="fit-sheet"]')?.addEventListener('click', () => {
+      cutZoom = 1;
+      renderApp(store.getState());
+    });
+  };
+
+  const renderApp = (state: AppState): void => {
+    if (viewMode === 'cut' || cutSettings.autoRecalculate) {
+      recalculateCutLayout(state);
+    }
+
+    projectNameInput.value = state.project.name;
+    projectThicknessInput.value = String(state.project.board_thickness_mm);
+    gridToggle.checked = state.project.settings.gridVisible;
+    snapToggle.checked = state.project.settings.snapEnabled;
+    snapSelect.value = String(state.project.settings.snapStepMm);
+    transparencyToggle.checked = state.project.settings.transparencyEnabled;
+    hideDoorsToggle.checked = state.project.settings.hideDoors;
+    openDoorsToggle.checked = state.project.settings.openDoors;
+    openDoorsToggle.disabled = state.project.settings.hideDoors;
+
+    sidebarTitle.textContent = viewMode === 'cut' ? 'Cut Parts' : 'Boards';
+    projectMeta.hidden = viewMode === 'cut';
+    layoutRoot.classList.toggle('layout--cut', viewMode === 'cut');
+    root.querySelectorAll<HTMLElement>('.project-only-panel, .project-only-toolbar').forEach((element) => {
+      element.hidden = viewMode === 'cut';
+    });
+    viewport.hidden = viewMode === 'cut';
+    cutWorkspace.hidden = viewMode !== 'cut';
+
+    renderBoardList(state);
+    renderProperties(state.project.boards.find((board) => board.id === state.selectedBoardId));
+    if (viewMode === 'cut') {
+      renderCutWorkspacePanel(state);
+    }
+
+    scene.setGridVisible(state.project.settings.gridVisible);
+    scene.setTransparencyEnabled(state.project.settings.transparencyEnabled);
+    scene.setDoorsHidden(state.project.settings.hideDoors);
+    scene.setDoorsOpen(state.project.settings.openDoors);
+    scene.renderBoards(state.project.boards, state.selectedBoardId);
+
+    root.querySelector('.toolbar-group--view-mode')?.replaceWith(document.createRange().createContextualFragment(renderViewModeToggle(viewMode)));
+    root.querySelectorAll<HTMLButtonElement>('[data-view-mode]').forEach((button) => {
+      button.addEventListener('click', () => {
+        viewMode = (button.dataset.viewMode as ViewMode) ?? 'project';
+        if (viewMode === 'cut') {
+          recalculateCutLayout(store.getState());
+        }
+        renderApp(store.getState());
+      });
     });
   };
 
@@ -442,32 +661,26 @@ export function createApp(root: HTMLElement): void {
     const current = store.getState().project.settings;
     store.updateProject({ settings: { ...current, gridVisible: gridToggle.checked } });
   });
-
   snapToggle.addEventListener('change', () => {
     const current = store.getState().project.settings;
     store.updateProject({ settings: { ...current, snapEnabled: snapToggle.checked } });
   });
-
   snapSelect.addEventListener('change', () => {
     const current = store.getState().project.settings;
     store.updateProject({ settings: { ...current, snapStepMm: Number(snapSelect.value) as 1 | 5 | 10 } });
   });
-
   transparencyToggle.addEventListener('change', () => {
     const current = store.getState().project.settings;
     store.updateProject({ settings: { ...current, transparencyEnabled: transparencyToggle.checked } });
   });
-
   hideDoorsToggle.addEventListener('change', () => {
     const current = store.getState().project.settings;
     store.updateProject({ settings: { ...current, hideDoors: hideDoorsToggle.checked } });
   });
-
   openDoorsToggle.addEventListener('change', () => {
     const current = store.getState().project.settings;
     store.updateProject({ settings: { ...current, openDoors: openDoorsToggle.checked } });
   });
-
   projectNameInput.addEventListener('change', () => store.updateProject({ name: projectNameInput.value }));
   projectThicknessInput.addEventListener('change', () => {
     const value = Number(projectThicknessInput.value);
@@ -480,7 +693,6 @@ export function createApp(root: HTMLElement): void {
       })),
     });
   });
-
   loadInput.addEventListener('change', async () => {
     const file = loadInput.files?.[0];
     if (file) {
@@ -489,98 +701,9 @@ export function createApp(root: HTMLElement): void {
     }
   });
 
-  const renderProperties = (board: Board | undefined): void => {
-    if (!board) {
-      propertiesPanel.innerHTML = '<div class="panel-header"><h2>Properties</h2></div><p class="empty-state">Select a board to edit its properties.</p>';
-      return;
-    }
-
-    propertiesPanel.innerHTML = `
-      <div class="panel-header"><h2>Properties</h2></div>
-      <div class="form-grid">
-        <label><span>Name</span><input data-field="name" type="text" value="${board.name}" /></label>
-        <label><span>Role</span><select data-field="role">${ROLE_OPTIONS.map((role) => `<option value="${role}" ${board.role === role ? 'selected' : ''}>${role}</option>`).join('')}</select></label>
-        <label><span>Material</span><input data-field="material" type="text" value="${board.material}" /></label>
-        ${mmInput('width_mm', board.width_mm)}
-        ${mmInput('height_mm', board.height_mm)}
-        ${mmInput('thickness_mm', board.thickness_mm)}
-        ${mmInput('x_mm', board.x_mm)}
-        ${mmInput('y_mm', board.y_mm)}
-        ${mmInput('z_mm', board.z_mm)}
-        <label><span>Orientation</span><select data-field="orientation">${ORIENTATION_OPTIONS.map((orientation) => `<option value="${orientation}" ${board.orientation === orientation ? 'selected' : ''}>${orientation}</option>`).join('')}</select></label>
-        <label class="full-width"><span>Note</span><textarea data-field="note" rows="4">${board.note}</textarea></label>
-      </div>
-    `;
-
-    propertiesPanel.querySelectorAll<HTMLInputElement>('[data-number-input]').forEach((input) => {
-      input.addEventListener('change', () => {
-        const field = input.dataset.numberInput as keyof Board;
-        const value = Number(input.value);
-        if (field === 'x_mm' || field === 'y_mm' || field === 'z_mm') {
-          store.moveBoardToPosition(board.id, { [field]: value } as Partial<Pick<Board, 'x_mm' | 'y_mm' | 'z_mm'>>);
-          return;
-        }
-        store.updateBoard(board.id, { [field]: value } as Partial<Board>);
-      });
-    });
-
-    propertiesPanel.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>('[data-field]').forEach((field) => {
-      field.addEventListener('change', () => {
-        const key = field.dataset.field as keyof Board;
-        const value = field.value;
-        if (key === 'orientation') {
-          store.setOrientation(board.id, value as Board['orientation']);
-          return;
-        }
-        store.updateBoard(board.id, { [key]: value } as Partial<Board>);
-      });
-    });
-  };
-
-  const renderBoardList = (state: AppState): void => {
-    boardList.innerHTML = state.project.boards
-      .map(
-        (board) => `
-          <button class="board-row ${board.id === state.selectedBoardId ? 'selected' : ''}" data-board-id="${board.id}">
-            <strong contenteditable="true" data-board-name="${board.id}">${board.name}</strong>
-            <span>${board.role}</span>
-            <small>${board.width_mm} × ${board.height_mm} × ${board.thickness_mm} mm</small>
-          </button>
-        `,
-      )
-      .join('');
-
-    boardList.querySelectorAll<HTMLElement>('[data-board-id]').forEach((element) => {
-      element.addEventListener('click', () => store.setSelectedBoard(element.dataset.boardId ?? null));
-    });
-
-    boardList.querySelectorAll<HTMLElement>('[data-board-name]').forEach((element) => {
-      element.addEventListener('blur', () => {
-        const id = element.dataset.boardName;
-        if (id) {
-          store.updateBoard(id, { name: element.textContent?.trim() || 'Board' });
-        }
-      });
-    });
-  };
-
   store.subscribe((state) => {
-    projectNameInput.value = state.project.name;
-    projectThicknessInput.value = String(state.project.board_thickness_mm);
-    gridToggle.checked = state.project.settings.gridVisible;
-    snapToggle.checked = state.project.settings.snapEnabled;
-    snapSelect.value = String(state.project.settings.snapStepMm);
-    transparencyToggle.checked = state.project.settings.transparencyEnabled;
-    hideDoorsToggle.checked = state.project.settings.hideDoors;
-    openDoorsToggle.checked = state.project.settings.openDoors;
-    openDoorsToggle.disabled = state.project.settings.hideDoors;
-    renderBoardList(state);
-    renderProperties(state.project.boards.find((board) => board.id === state.selectedBoardId));
-    scene.setGridVisible(state.project.settings.gridVisible);
-    scene.setTransparencyEnabled(state.project.settings.transparencyEnabled);
-    scene.setDoorsHidden(state.project.settings.hideDoors);
-    scene.setDoorsOpen(state.project.settings.openDoors);
-    scene.renderBoards(state.project.boards, state.selectedBoardId);
+    renderApp(state);
   });
+
   window.addEventListener('beforeunload', () => scene.dispose(), { once: true });
 }

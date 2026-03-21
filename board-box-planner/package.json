@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "tsc -p tsconfig.test.json && node -e \"require('node:fs').writeFileSync('dist-tests/package.json', JSON.stringify({type:'commonjs'}))\" && node run-tests.cjs"
   },
   "dependencies": {
     "three": "^0.180.0"
