@@ -19,6 +19,8 @@ export interface AppSettings {
   snapEnabled: boolean;
   snapStepMm: (typeof SNAP_STEPS_MM)[number];
   transparencyEnabled: boolean;
+  hideDoors: boolean;
+  openDoors: boolean;
 }
 
 export interface Board {
@@ -89,6 +91,8 @@ export function createEmptyProject(): Project {
       snapEnabled: true,
       snapStepMm: 10,
       transparencyEnabled: false,
+      hideDoors: false,
+      openDoors: false,
     },
   };
 }
@@ -127,6 +131,8 @@ export function projectFromJson(raw: string): Project {
         ? (parsed.settings?.snapStepMm as (typeof SNAP_STEPS_MM)[number])
         : 10,
       transparencyEnabled: parsed.settings?.transparencyEnabled ?? false,
+      hideDoors: parsed.settings?.hideDoors ?? false,
+      openDoors: parsed.settings?.openDoors ?? false,
     },
   };
 }

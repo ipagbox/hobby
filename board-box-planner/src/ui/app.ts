@@ -235,10 +235,20 @@ export function createApp(root: HTMLElement): void {
         </aside>
         <section class="viewport-panel panel">
           <div class="viewport" data-viewport></div>
-          <label class="viewport-toggle">
-            <input data-action="toggle-transparency" type="checkbox" />
-            <span>Transparency</span>
-          </label>
+          <div class="viewport-toggles">
+            <label class="viewport-toggle">
+              <input data-action="toggle-transparency" type="checkbox" />
+              <span>Transparency</span>
+            </label>
+            <label class="viewport-toggle">
+              <input data-action="toggle-hide-doors" type="checkbox" />
+              <span>Hide Doors</span>
+            </label>
+            <label class="viewport-toggle viewport-toggle--nested">
+              <input data-action="toggle-open-doors" type="checkbox" />
+              <span>Open Doors</span>
+            </label>
+          </div>
           <div class="move-pad">
             <span>Move selected</span>
             <div class="move-pad-grid">
@@ -271,9 +281,11 @@ export function createApp(root: HTMLElement): void {
   const snapSelect = root.querySelector<HTMLSelectElement>('[data-action="snap-step"]');
   const loadInput = root.querySelector<HTMLInputElement>('[data-action="load"]');
   const transparencyToggle = root.querySelector<HTMLInputElement>('[data-action="toggle-transparency"]');
+  const hideDoorsToggle = root.querySelector<HTMLInputElement>('[data-action="toggle-hide-doors"]');
+  const openDoorsToggle = root.querySelector<HTMLInputElement>('[data-action="toggle-open-doors"]');
   const modalRoot = root.querySelector<HTMLElement>('[data-modal-root]');
 
-  if (!viewport || !boardList || !propertiesPanel || !projectNameInput || !projectThicknessInput || !gridToggle || !snapToggle || !snapSelect || !loadInput || !transparencyToggle || !modalRoot) {
+  if (!viewport || !boardList || !propertiesPanel || !projectNameInput || !projectThicknessInput || !gridToggle || !snapToggle || !snapSelect || !loadInput || !transparencyToggle || !hideDoorsToggle || !openDoorsToggle || !modalRoot) {
     throw new Error('App UI failed to initialize');
   }
 
@@ -446,6 +458,16 @@ export function createApp(root: HTMLElement): void {
     store.updateProject({ settings: { ...current, transparencyEnabled: transparencyToggle.checked } });
   });
 
+  hideDoorsToggle.addEventListener('change', () => {
+    const current = store.getState().project.settings;
+    store.updateProject({ settings: { ...current, hideDoors: hideDoorsToggle.checked } });
+  });
+
+  openDoorsToggle.addEventListener('change', () => {
+    const current = store.getState().project.settings;
+    store.updateProject({ settings: { ...current, openDoors: openDoorsToggle.checked } });
+  });
+
   projectNameInput.addEventListener('change', () => store.updateProject({ name: projectNameInput.value }));
   projectThicknessInput.addEventListener('change', () => {
     const value = Number(projectThicknessInput.value);
@@ -549,10 +571,15 @@ export function createApp(root: HTMLElement): void {
     snapToggle.checked = state.project.settings.snapEnabled;
     snapSelect.value = String(state.project.settings.snapStepMm);
     transparencyToggle.checked = state.project.settings.transparencyEnabled;
+    hideDoorsToggle.checked = state.project.settings.hideDoors;
+    openDoorsToggle.checked = state.project.settings.openDoors;
+    openDoorsToggle.disabled = state.project.settings.hideDoors;
     renderBoardList(state);
     renderProperties(state.project.boards.find((board) => board.id === state.selectedBoardId));
     scene.setGridVisible(state.project.settings.gridVisible);
     scene.setTransparencyEnabled(state.project.settings.transparencyEnabled);
+    scene.setDoorsHidden(state.project.settings.hideDoors);
+    scene.setDoorsOpen(state.project.settings.openDoors);
     scene.renderBoards(state.project.boards, state.selectedBoardId);
   });
   window.addEventListener('beforeunload', () => scene.dispose(), { once: true });

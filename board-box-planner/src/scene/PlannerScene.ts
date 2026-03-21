@@ -7,6 +7,8 @@ const ORIENTATION_GIZMO_RADIUS_PX = 28;
 const TRANSPARENT_BOARD_OPACITY = 0.28;
 const CAMERA_TARGET = new THREE.Vector3(300, 240, 300);
 const PERSPECTIVE_CAMERA_OFFSET = new THREE.Vector3(-CAMERA_DISTANCE * 0.9, CAMERA_DISTANCE * 0.65, -CAMERA_DISTANCE * 0.95);
+const DOOR_OPEN_ANGLE = Math.PI / 2 - 0.18;
+const DOOR_ANIMATION_LERP = 0.14;
 type BoardPosition = Pick<Board, 'x_mm' | 'y_mm' | 'z_mm'>;
 type AxisKey = keyof BoardPosition;
 
@@ -25,6 +27,18 @@ type OrientationAxisIndicator = {
   root: HTMLDivElement;
   line: HTMLDivElement;
   label: HTMLSpanElement;
+};
+
+type DoorAnimationDirection = 'left' | 'right';
+
+type BoardMeshEntry = {
+  root: any;
+  mesh: any;
+  board: Board;
+  isDoor: boolean;
+  currentDoorAngle?: number;
+  targetDoorAngle?: number;
+  doorDirection?: DoorAnimationDirection;
 };
 
 function createBoardMaterial(selected: boolean, transparencyEnabled: boolean) {
@@ -58,7 +72,8 @@ function createBoardEdges(geometry: any, transparencyEnabled: boolean): any {
   return edges;
 }
 
-function disposeBoardMesh(mesh: any): void {
+function disposeBoardMesh(entry: BoardMeshEntry): void {
+  const mesh = entry.mesh;
   mesh.geometry.dispose();
   const material = mesh.material;
   if (Array.isArray(material)) {
@@ -91,6 +106,14 @@ function updateBoardGeometry(mesh: any, size: [number, number, number], transpar
   mesh.clear();
   mesh.add(createBoardEdges(geometry, transparencyEnabled));
   mesh.userData.size = size;
+}
+
+
+function getDoorSwingDirection(board: Board, sortedDoors: Board[]): DoorAnimationDirection {
+  if (sortedDoors.length <= 1) return 'left';
+  const doorIndex = sortedDoors.findIndex((item) => item.id === board.id);
+  if (doorIndex === sortedDoors.length - 1) return 'right';
+  return 'left';
 }
 
 function updateBoardAppearance(mesh: any, selected: boolean, transparencyEnabled: boolean): void {
@@ -140,9 +163,11 @@ export class PlannerScene {
   private readonly orientationGizmo: HTMLDivElement;
   private readonly orientationIndicators: Record<OrientationAxisKey, OrientationAxisIndicator>;
   private animationFrame = 0;
-  private readonly boardMeshes = new Map<string, any>();
+  private readonly boardMeshes = new Map<string, BoardMeshEntry>();
   private activeAxisDrag: ActiveAxisDrag | null = null;
   private transparencyEnabled = false;
+  private hideDoors = false;
+  private openDoors = false;
   private onBoardSelected: (id: string | null) => void;
   private onBoardMoved: (id: string, position: Partial<BoardPosition>) => void;
 
@@ -211,18 +236,37 @@ export class PlannerScene {
   setTransparencyEnabled(enabled: boolean): void {
     if (this.transparencyEnabled === enabled) return;
     this.transparencyEnabled = enabled;
-    this.boardMeshes.forEach((mesh) => {
-      updateBoardAppearance(mesh as any, (mesh.userData.isSelected as boolean) ?? false, this.transparencyEnabled);
+    this.boardMeshes.forEach((entry) => {
+      updateBoardAppearance(entry.mesh as any, (entry.mesh.userData.isSelected as boolean) ?? false, this.transparencyEnabled);
+    });
+  }
+
+  setDoorsHidden(enabled: boolean): void {
+    this.hideDoors = enabled;
+    this.boardMeshes.forEach((entry) => {
+      if (!entry.isDoor) return;
+      entry.root.visible = !enabled;
+    });
+  }
+
+  setDoorsOpen(enabled: boolean): void {
+    this.openDoors = enabled;
+    this.boardMeshes.forEach((entry) => {
+      if (!entry.isDoor) return;
+      entry.targetDoorAngle = enabled
+        ? (entry.doorDirection === 'right' ? DOOR_OPEN_ANGLE : -DOOR_OPEN_ANGLE)
+        : 0;
     });
   }
 
   renderBoards(boards: Board[], selectedBoardId: string | null): void {
+    const doorBoards = boards.filter((board) => board.role === 'door' && board.orientation === 'XY').sort((a, b) => a.x_mm - b.x_mm);
     const nextIds = new Set(boards.map((board) => board.id));
 
-    for (const [id, mesh] of this.boardMeshes.entries()) {
+    for (const [id, entry] of this.boardMeshes.entries()) {
       if (nextIds.has(id)) continue;
-      disposeBoardMesh(mesh);
-      this.boardGroup.remove(mesh);
+      disposeBoardMesh(entry);
+      this.boardGroup.remove(entry.root);
       this.boardMeshes.delete(id);
       if (this.activeAxisDrag?.boardId === id) this.activeAxisDrag = null;
     }
@@ -230,19 +274,43 @@ export class PlannerScene {
     boards.forEach((board) => {
       const size: [number, number, number] = boardSizeVector(board);
       const isSelected = board.id === selectedBoardId;
-      let mesh = this.boardMeshes.get(board.id);
+      let entry = this.boardMeshes.get(board.id);
+      const isDoor = board.role === 'door' && board.orientation === 'XY';
+      const doorDirection = isDoor ? getDoorSwingDirection(board, doorBoards) : undefined;
 
-      if (!mesh) {
+      if (!entry) {
         const geometry = new THREE.BoxGeometry(...size);
         const material = createBoardMaterial(isSelected, this.transparencyEnabled);
-        mesh = new THREE.Mesh(geometry, material);
+        const mesh = new THREE.Mesh(geometry, material);
         mesh.userData.boardId = board.id;
         mesh.userData.size = size;
         mesh.userData.isSelected = isSelected;
         mesh.add(createBoardEdges(geometry, this.transparencyEnabled));
-        this.boardMeshes.set(board.id, mesh);
-        this.boardGroup.add(mesh);
+
+        if (isDoor) {
+          const pivot = new THREE.Group();
+          const hingeOffset = doorDirection === 'right' ? size[0] / 2 : -size[0] / 2;
+          mesh.position.set(-hingeOffset, 0, 0);
+          entry = {
+            root: pivot,
+            mesh,
+            board,
+            isDoor: true,
+            currentDoorAngle: 0,
+            targetDoorAngle: this.openDoors ? (doorDirection === 'right' ? DOOR_OPEN_ANGLE : -DOOR_OPEN_ANGLE) : 0,
+            doorDirection,
+          };
+          pivot.add(mesh);
+          pivot.visible = !this.hideDoors;
+          this.boardMeshes.set(board.id, entry);
+          this.boardGroup.add(pivot);
+        } else {
+          entry = { root: mesh, mesh, board, isDoor: false };
+          this.boardMeshes.set(board.id, entry);
+          this.boardGroup.add(mesh);
+        }
       } else {
+        const mesh = entry.mesh;
         const currentSize = mesh.userData.size as [number, number, number] | undefined;
         if (!currentSize || currentSize.some((value, index) => Math.abs(value - size[index]) > 0.001)) {
           updateBoardGeometry(mesh, size, this.transparencyEnabled);
@@ -251,11 +319,26 @@ export class PlannerScene {
           updateBoardAppearance(mesh, isSelected, this.transparencyEnabled);
         }
         mesh.userData.size = size;
+        entry.board = board;
+        entry.isDoor = isDoor;
+        entry.doorDirection = doorDirection;
+        if (isDoor) {
+          const hingeOffset = doorDirection === 'right' ? size[0] / 2 : -size[0] / 2;
+          mesh.position.set(-hingeOffset, 0, 0);
+          entry.root.visible = !this.hideDoors;
+          entry.targetDoorAngle = this.openDoors ? (doorDirection === 'right' ? DOOR_OPEN_ANGLE : -DOOR_OPEN_ANGLE) : 0;
+        }
       }
 
+      const mesh = entry.mesh;
       mesh.userData.isSelected = isSelected;
       mesh.userData.transparencyEnabled = this.transparencyEnabled;
-      mesh.position.set(board.x_mm, board.y_mm, board.z_mm);
+      if (entry.isDoor) {
+        const hingeOffset = entry.doorDirection === 'right' ? size[0] / 2 : -size[0] / 2;
+        entry.root.position.set(board.x_mm + hingeOffset, board.y_mm, board.z_mm);
+      } else {
+        entry.root.position.set(board.x_mm, board.y_mm, board.z_mm);
+      }
     });
   }
 
@@ -295,10 +378,10 @@ export class PlannerScene {
   }
 
   beginAxisDrag(axis: AxisKey, boardId: string, clientX: number, clientY: number, snapStepMm: number): void {
-    const mesh = this.boardMeshes.get(boardId);
-    if (!mesh) return;
+    const entry = this.boardMeshes.get(boardId);
+    if (!entry) return;
 
-    const origin = mesh.position.clone();
+    const origin = new THREE.Vector3(entry.board.x_mm, entry.board.y_mm, entry.board.z_mm);
     const axisVector = new THREE.Vector3(
       axis === 'x_mm' ? 1 : 0,
       axis === 'y_mm' ? 1 : 0,
@@ -369,8 +452,8 @@ export class PlannerScene {
   private handleWindowPointerMove = (event: PointerEvent): void => {
     if (!this.activeAxisDrag) return;
     const drag = this.activeAxisDrag;
-    const mesh = this.boardMeshes.get(drag.boardId);
-    if (!mesh) return;
+    const entry = this.boardMeshes.get(drag.boardId);
+    if (!entry) return;
 
     const pointerDelta = new THREE.Vector2(event.clientX - drag.originClient.x, event.clientY - drag.originClient.y);
     const movementOnAxisPx = pointerDelta.dot(drag.axisScreenDirection);
@@ -417,6 +500,14 @@ export class PlannerScene {
   private animate = (): void => {
     this.animationFrame = requestAnimationFrame(this.animate);
     this.controls.update();
+    this.boardMeshes.forEach((entry) => {
+      if (!entry.isDoor) return;
+      const current = entry.currentDoorAngle ?? 0;
+      const target = this.hideDoors ? 0 : (entry.targetDoorAngle ?? 0);
+      const next = Math.abs(target - current) < 0.001 ? target : current + (target - current) * DOOR_ANIMATION_LERP;
+      entry.currentDoorAngle = next;
+      entry.root.rotation.y = next;
+    });
     this.updateOrientationGizmo();
     this.renderer.render(this.scene, this.camera);
   };
