@@ -55,7 +55,7 @@ function snapAxisPosition(board: Board, others: Board[], axis: keyof BoardPositi
 
 function getSnappedPosition(project: Project, boardId: string, partial: Partial<BoardPosition>): Partial<BoardPosition> {
   const board = project.boards.find((item) => item.id === boardId);
-  if (!board) return partial;
+  if (!board || !project.settings.snapEnabled) return partial;
   const draft = { ...board, ...partial };
   const others = project.boards.filter((item) => item.id !== boardId);
   const threshold = project.settings.snapStepMm;
