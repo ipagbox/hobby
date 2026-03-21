@@ -326,6 +326,7 @@ export function createApp(root: HTMLElement): void {
 
   const renderCustomModal = (): void => {
     const previousScrollTop = modalRoot.querySelector<HTMLElement>('.modal-body')?.scrollTop ?? 0;
+    const focusedKey = (document.activeElement as HTMLElement | null)?.dataset?.customNumber ?? null;
     const validation = validateCustomBoxConfig(customConfig);
     modalRoot.innerHTML = createCustomGenerationModal(customConfig, validation.errors);
     const modal = modalRoot.querySelector<HTMLElement>('[data-custom-modal]');
@@ -333,6 +334,10 @@ export function createApp(root: HTMLElement): void {
 
     const modalBody = modal.querySelector<HTMLElement>('.modal-body');
     if (modalBody) modalBody.scrollTop = previousScrollTop;
+
+    if (focusedKey) {
+      modal.querySelector<HTMLInputElement>(`[data-custom-number="${focusedKey}"]`)?.focus();
+    }
 
     modal.querySelectorAll<HTMLElement>('[data-custom-close]').forEach((element) => {
       element.addEventListener('click', () => {
@@ -449,9 +454,9 @@ export function createApp(root: HTMLElement): void {
     propertiesPanel.innerHTML = `
       <div class="panel-header"><h2>Properties</h2></div>
       <div class="form-grid">
-        <label><span>Name</span><input data-field="name" type="text" value="${board.name}" /></label>
+        <label><span>Name</span><input data-field="name" type="text" value="${escapeHtml(board.name)}" /></label>
         <label><span>Role</span><select data-field="role">${ROLE_OPTIONS.map((role) => `<option value="${role}" ${board.role === role ? 'selected' : ''}>${role}</option>`).join('')}</select></label>
-        <label><span>Material</span><input data-field="material" type="text" value="${board.material}" /></label>
+        <label><span>Material</span><input data-field="material" type="text" value="${escapeHtml(board.material)}" /></label>
         ${mmInput('width_mm', board.width_mm)}
         ${mmInput('height_mm', board.height_mm)}
         ${mmInput('thickness_mm', board.thickness_mm)}
@@ -459,7 +464,7 @@ export function createApp(root: HTMLElement): void {
         ${mmInput('y_mm', board.y_mm)}
         ${mmInput('z_mm', board.z_mm)}
         <label><span>Orientation</span><select data-field="orientation">${ORIENTATION_OPTIONS.map((orientation) => `<option value="${orientation}" ${board.orientation === orientation ? 'selected' : ''}>${orientation}</option>`).join('')}</select></label>
-        <label class="full-width"><span>Note</span><textarea data-field="note" rows="4">${board.note}</textarea></label>
+        <label class="full-width"><span>Note</span><textarea data-field="note" rows="4">${escapeHtml(board.note)}</textarea></label>
       </div>
     `;
 
@@ -503,8 +508,8 @@ export function createApp(root: HTMLElement): void {
       .map(
         (board) => `
           <button class="board-row ${board.id === state.selectedBoardId ? 'selected' : ''}" data-board-id="${board.id}">
-            <strong contenteditable="true" data-board-name="${board.id}">${board.name}</strong>
-            <span>${board.role}</span>
+            <strong contenteditable="true" data-board-name="${board.id}">${escapeHtml(board.name)}</strong>
+            <span>${escapeHtml(board.role)}</span>
             <small>${board.width_mm} × ${board.height_mm} × ${board.thickness_mm} mm</small>
           </button>
         `,
@@ -696,7 +701,11 @@ export function createApp(root: HTMLElement): void {
   loadInput.addEventListener('change', async () => {
     const file = loadInput.files?.[0];
     if (file) {
-      await store.loadFromFile(file);
+      try {
+        await store.loadFromFile(file);
+      } catch (error) {
+        alert(`Failed to load project: ${error instanceof Error ? error.message : 'Invalid file'}`);
+      }
       loadInput.value = '';
     }
   });

@@ -96,6 +96,6 @@ export function preparePacking(group: CutMaterialGroup | null, settings: CutLayo
   }
 
   const { valid, invalid, issues } = validateParts(group.parts, settings);
-  const sorted = [...valid].sort((a, b) => Math.max(b.widthMm, b.heightMm) - Math.max(a.widthMm, a.heightMm) || (b.widthMm * b.heightMm) - (a.widthMm * a.heightMm));
+  const sorted = [...valid].sort((a, b) => Math.max(b.widthMm, b.heightMm) - Math.max(a.widthMm, a.heightMm) || (b.widthMm * b.heightMm) - (a.widthMm * a.heightMm) || a.id.localeCompare(b.id));
   return { validParts: sorted, invalidParts: invalid, issues };
 }

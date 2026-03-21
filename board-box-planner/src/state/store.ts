@@ -13,10 +13,7 @@ type BoardPosition = Pick<Board, 'x_mm' | 'y_mm' | 'z_mm'>;
 const POSITION_AXES: Array<keyof BoardPosition> = ['x_mm', 'y_mm', 'z_mm'];
 
 function cloneState(state: AppState): AppState {
-  return {
-    project: JSON.parse(JSON.stringify(state.project)) as Project,
-    selectedBoardId: state.selectedBoardId,
-  };
+  return structuredClone(state);
 }
 
 function boardExtents(board: Board): Record<keyof BoardPosition, { min: number; max: number }> {
