@@ -14,8 +14,44 @@ const AXIS_BUTTONS: Array<{ axis: 'x_mm' | 'y_mm' | 'z_mm'; label: string; color
   { axis: 'z_mm', label: 'Z', colorClass: 'axis-z' },
 ];
 
+const TOOLBAR_ACTIONS = {
+  project: [
+    { action: 'new-project', icon: '📁', label: 'New project' },
+    { action: 'save', icon: '💾', label: 'Save project' },
+  ],
+  boards: [
+    { action: 'new-board', icon: '➕', label: 'New board' },
+    { action: 'duplicate', icon: '⧉', label: 'Duplicate board' },
+    { action: 'delete', icon: '🗑', label: 'Delete board' },
+  ],
+} as const;
+
+const VIEW_ACTIONS = [
+  { view: 'front', icon: 'F', label: 'Front view' },
+  { view: 'top', icon: 'T', label: 'Top view' },
+  { view: 'left', icon: 'L', label: 'Left view' },
+  { view: 'right', icon: 'R', label: 'Right view' },
+  { view: 'perspective', icon: '3D', label: 'Perspective view' },
+] as const;
+
 function mmInput(label: string, value: number): string {
   return `<label><span>${label}</span><input data-number-input="${label}" type="number" value="${value}" step="1" /></label>`;
+}
+
+function createIconButton(action: string, icon: string, label: string, extraClass = ''): string {
+  return `
+    <button type="button" class="icon-button ${extraClass}" data-action="${action}" title="${label}" aria-label="${label}">
+      <span class="icon-button__glyph" aria-hidden="true">${icon}</span>
+    </button>
+  `;
+}
+
+function createViewButton(view: string, icon: string, label: string): string {
+  return `
+    <button type="button" class="icon-button icon-button--view" data-view="${view}" title="${label}" aria-label="${label}">
+      <span class="icon-button__glyph" aria-hidden="true">${icon}</span>
+    </button>
+  `;
 }
 
 function getDefaultCustomConfig(globalThicknessMm: number): CustomBoxConfig {
@@ -130,29 +166,49 @@ export function createApp(root: HTMLElement): void {
   root.innerHTML = `
     <div class="app-shell">
       <header class="toolbar">
-        <div class="toolbar-group">
-          <button data-action="new-project">New project</button>
-          <button data-action="new-board">New board</button>
-          <button data-action="duplicate">Duplicate</button>
-          <button data-action="delete">Delete</button>
+        <div class="toolbar-groups">
+          <div class="toolbar-group toolbar-group--icons" aria-label="Project actions">
+            <div class="toolbar-section-label">Project</div>
+            <div class="toolbar-icon-strip">
+              ${TOOLBAR_ACTIONS.project.map(({ action, icon, label }) => createIconButton(action, icon, label)).join('')}
+              <label class="icon-button icon-button--file" title="Load project" aria-label="Load project">
+                <span class="icon-button__glyph" aria-hidden="true">📂</span>
+                <input data-action="load" type="file" accept="application/json" hidden />
+              </label>
+            </div>
+          </div>
+
+          <div class="toolbar-group toolbar-group--icons" aria-label="Board actions">
+            <div class="toolbar-section-label">Boards</div>
+            <div class="toolbar-icon-strip">
+              ${TOOLBAR_ACTIONS.boards.map(({ action, icon, label }) => createIconButton(action, icon, label)).join('')}
+            </div>
+          </div>
+
+          <div class="toolbar-group toolbar-group--custom" aria-label="Custom generation">
+            <div class="toolbar-section-label">Generate</div>
+            ${createIconButton('custom-generation', '✨', 'Custom Generation', 'icon-button--accent')}
+          </div>
+
+          <div class="toolbar-group toolbar-group--icons" aria-label="Camera views">
+            <div class="toolbar-section-label">Views</div>
+            <div class="toolbar-icon-strip">
+              ${VIEW_ACTIONS.map(({ view, icon, label }) => createViewButton(view, icon, label)).join('')}
+            </div>
+          </div>
         </div>
-        <div class="toolbar-group">
-          <button data-action="save">Save project</button>
-          <label class="file-button">Load project<input data-action="load" type="file" accept="application/json" hidden /></label>
-          <button data-action="custom-generation">Custom Generation</button>
-        </div>
-        <div class="toolbar-group">
-          <button data-action="reset-camera">Reset camera</button>
-          <button data-view="front">Front</button>
-          <button data-view="top">Top</button>
-          <button data-view="left">Left</button>
-          <button data-view="right">Right</button>
-          <button data-view="perspective">Perspective</button>
-        </div>
-        <div class="toolbar-group compact">
-          <label><span>Grid</span><input data-action="toggle-grid" type="checkbox" /></label>
-          <label>
+
+        <div class="toolbar-group toolbar-group--settings compact">
+          <label class="toolbar-toggle">
+            <input data-action="toggle-grid" type="checkbox" />
+            <span>Grid</span>
+          </label>
+          <label class="toolbar-toggle">
+            <input data-action="toggle-snap" type="checkbox" />
             <span>Snap</span>
+          </label>
+          <label class="toolbar-field">
+            <span>Step</span>
             <select data-action="snap-step"></select>
           </label>
         </div>
@@ -191,7 +247,7 @@ export function createApp(root: HTMLElement): void {
                 `,
               ).join('')}
             </div>
-            <small class="move-pad-hint">Tap ± for one snap step, or hold the middle block and drag the mouse to move along that axis.</small>
+            <small class="move-pad-hint">Tap ± for one step, or hold the middle block and drag the mouse to move along that axis.</small>
           </div>
         </section>
         <aside class="panel properties-panel" data-properties-panel></aside>
@@ -206,12 +262,13 @@ export function createApp(root: HTMLElement): void {
   const projectNameInput = root.querySelector<HTMLInputElement>('[data-project-name]');
   const projectThicknessInput = root.querySelector<HTMLInputElement>('[data-project-thickness]');
   const gridToggle = root.querySelector<HTMLInputElement>('[data-action="toggle-grid"]');
+  const snapToggle = root.querySelector<HTMLInputElement>('[data-action="toggle-snap"]');
   const snapSelect = root.querySelector<HTMLSelectElement>('[data-action="snap-step"]');
   const loadInput = root.querySelector<HTMLInputElement>('[data-action="load"]');
   const transparencyToggle = root.querySelector<HTMLInputElement>('[data-action="toggle-transparency"]');
   const modalRoot = root.querySelector<HTMLElement>('[data-modal-root]');
 
-  if (!viewport || !boardList || !propertiesPanel || !projectNameInput || !projectThicknessInput || !gridToggle || !snapSelect || !loadInput || !transparencyToggle || !modalRoot) {
+  if (!viewport || !boardList || !propertiesPanel || !projectNameInput || !projectThicknessInput || !gridToggle || !snapToggle || !snapSelect || !loadInput || !transparencyToggle || !modalRoot) {
     throw new Error('App UI failed to initialize');
   }
 
@@ -316,9 +373,6 @@ export function createApp(root: HTMLElement): void {
         case 'save':
           store.saveToFile();
           break;
-        case 'reset-camera':
-          scene.resetCamera();
-          break;
         case 'custom-generation':
           customConfig = {
             ...customConfig,
@@ -356,6 +410,11 @@ export function createApp(root: HTMLElement): void {
   gridToggle.addEventListener('change', () => {
     const current = store.getState().project.settings;
     store.updateProject({ settings: { ...current, gridVisible: gridToggle.checked } });
+  });
+
+  snapToggle.addEventListener('change', () => {
+    const current = store.getState().project.settings;
+    store.updateProject({ settings: { ...current, snapEnabled: snapToggle.checked } });
   });
 
   snapSelect.addEventListener('change', () => {
@@ -468,6 +527,7 @@ export function createApp(root: HTMLElement): void {
     projectNameInput.value = state.project.name;
     projectThicknessInput.value = String(state.project.board_thickness_mm);
     gridToggle.checked = state.project.settings.gridVisible;
+    snapToggle.checked = state.project.settings.snapEnabled;
     snapSelect.value = String(state.project.settings.snapStepMm);
     transparencyToggle.checked = state.project.settings.transparencyEnabled;
     renderBoardList(state);
