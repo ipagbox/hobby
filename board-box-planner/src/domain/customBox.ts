@@ -73,7 +73,7 @@ function getDoorWidth(config: CustomBoxConfig): number {
 function getDistributedCenters(start: number, totalSpan: number, itemSize: number, count: number): number[] {
   if (count <= 0) return [];
   const clearSpan = totalSpan - itemSize * count;
-  const gap = clearSpan / (count + 1);
+  const gap = Math.max(clearSpan, 0) / (count + 1);
   const centers: number[] = [];
   let cursor = start;
 

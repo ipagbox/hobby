@@ -61,7 +61,7 @@ export const ROLE_OPTIONS: BoardRole[] = [
 export const ORIENTATION_OPTIONS: Orientation[] = ['XY', 'XZ', 'YZ'];
 
 export function createBoardId(): string {
-  return `board_${Math.random().toString(36).slice(2, 10)}`;
+  return `board_${crypto.randomUUID()}`;
 }
 
 export function createBoard(partial: Partial<Board> = {}, globalThickness = DEFAULT_BOARD_THICKNESS_MM): Board {
