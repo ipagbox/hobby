@@ -1,10 +1,19 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
 import { boardSizeVector, type Board } from '../domain/model';
 
 const CAMERA_DISTANCE = 1800;
 type BoardPosition = Pick<Board, 'x_mm' | 'y_mm' | 'z_mm'>;
+type AxisKey = keyof BoardPosition;
+
+type ActiveAxisDrag = {
+  axis: AxisKey;
+  boardId: string;
+  originClient: any;
+  originWorldPosition: any;
+  axisScreenDirection: any;
+  snapStepMm: number;
+};
 
 function createBoardMaterial(selected: boolean) {
   return new THREE.MeshStandardMaterial({
@@ -59,7 +68,6 @@ export class PlannerScene {
   private readonly camera: any;
   private readonly renderer: any;
   private readonly controls: any;
-  private readonly transformControls: any;
   private readonly raycaster = new THREE.Raycaster();
   private readonly pointer = new THREE.Vector2();
   private readonly boardGroup = new THREE.Group();
@@ -67,6 +75,7 @@ export class PlannerScene {
   private readonly axes = new THREE.AxesHelper(250);
   private animationFrame = 0;
   private readonly boardMeshes = new Map<string, any>();
+  private activeAxisDrag: ActiveAxisDrag | null = null;
   private onBoardSelected: (id: string | null) => void;
   private onBoardMoved: (id: string, position: Partial<BoardPosition>) => void;
 
@@ -90,18 +99,9 @@ export class PlannerScene {
     this.controls.enableDamping = true;
     this.controls.target.set(300, 240, 300);
 
-    this.transformControls = new TransformControls(this.camera, this.renderer.domElement);
-    this.transformControls.setMode('translate');
-    this.transformControls.setSpace('world');
-    this.transformControls.addEventListener('dragging-changed', ((event: { value: boolean }) => {
-      this.controls.enabled = !event.value;
-    }) as unknown as EventListener);
-    this.transformControls.addEventListener('objectChange', this.handleTransformChange as EventListener);
-
     this.scene.add(this.grid);
     this.scene.add(this.axes);
     this.scene.add(this.boardGroup);
-    this.scene.add(this.transformControls);
 
     this.scene.add(new THREE.AmbientLight(0xffffff, 0.7));
     const directional = new THREE.DirectionalLight(0xffffff, 1.1);
@@ -109,6 +109,8 @@ export class PlannerScene {
     this.scene.add(directional);
 
     this.renderer.domElement.addEventListener('pointerdown', this.handlePointerDown);
+    window.addEventListener('pointermove', this.handleWindowPointerMove);
+    window.addEventListener('pointerup', this.handleWindowPointerUp);
     window.addEventListener('resize', this.resize);
     this.resize();
     this.animate();
@@ -117,10 +119,10 @@ export class PlannerScene {
   dispose(): void {
     cancelAnimationFrame(this.animationFrame);
     this.renderer.domElement.removeEventListener('pointerdown', this.handlePointerDown);
+    window.removeEventListener('pointermove', this.handleWindowPointerMove);
+    window.removeEventListener('pointerup', this.handleWindowPointerUp);
     window.removeEventListener('resize', this.resize);
-    this.transformControls.removeEventListener('objectChange', this.handleTransformChange as EventListener);
     this.controls.dispose();
-    this.transformControls.dispose();
     this.renderer.dispose();
   }
 
@@ -133,12 +135,10 @@ export class PlannerScene {
 
     for (const [id, mesh] of this.boardMeshes.entries()) {
       if (nextIds.has(id)) continue;
-      if (this.transformControls.object === mesh) {
-        this.transformControls.detach();
-      }
       disposeBoardMesh(mesh);
       this.boardGroup.remove(mesh);
       this.boardMeshes.delete(id);
+      if (this.activeAxisDrag?.boardId === id) this.activeAxisDrag = null;
     }
 
     boards.forEach((board) => {
@@ -168,15 +168,6 @@ export class PlannerScene {
 
       mesh.position.set(board.x_mm, board.y_mm, board.z_mm);
     });
-
-    const selectedMesh = selectedBoardId ? this.boardMeshes.get(selectedBoardId) ?? null : null;
-    if (selectedMesh) {
-      this.transformControls.attach(selectedMesh);
-      this.transformControls.enabled = true;
-    } else {
-      this.transformControls.detach();
-      this.transformControls.enabled = false;
-    }
   }
 
   resetCamera(): void {
@@ -212,18 +203,76 @@ export class PlannerScene {
     this.controls.update();
   }
 
-  private handleTransformChange = (): void => {
-    const object = this.transformControls.object;
-    if (!object?.userData.boardId) return;
-    this.onBoardMoved(object.userData.boardId, {
-      x_mm: object.position.x,
-      y_mm: object.position.y,
-      z_mm: object.position.z,
-    });
+  beginAxisDrag(axis: AxisKey, boardId: string, clientX: number, clientY: number, snapStepMm: number): void {
+    const mesh = this.boardMeshes.get(boardId);
+    if (!mesh) return;
+
+    const origin = mesh.position.clone();
+    const axisVector = new THREE.Vector3(
+      axis === 'x_mm' ? 1 : 0,
+      axis === 'y_mm' ? 1 : 0,
+      axis === 'z_mm' ? 1 : 0,
+    );
+    const originScreen = this.worldToScreen(origin);
+    const offsetScreen = this.worldToScreen(origin.clone().add(axisVector.clone().multiplyScalar(100)));
+    const direction = offsetScreen.sub(originScreen);
+
+    if (direction.lengthSq() < 4) {
+      direction.set(1, 0);
+    } else {
+      direction.normalize();
+    }
+
+    this.activeAxisDrag = {
+      axis,
+      boardId,
+      originClient: new THREE.Vector2(clientX, clientY),
+      originWorldPosition: origin,
+      axisScreenDirection: direction,
+      snapStepMm,
+    };
+
+    this.controls.enabled = false;
+    document.body.classList.add('axis-dragging');
+  }
+
+  private worldToScreen(point: any): any {
+    const projected = point.clone().project(this.camera);
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    return new THREE.Vector2(
+      rect.left + ((projected.x + 1) * rect.width) / 2,
+      rect.top + ((-projected.y + 1) * rect.height) / 2,
+    );
+  }
+
+  private handleWindowPointerMove = (event: PointerEvent): void => {
+    if (!this.activeAxisDrag) return;
+    const drag = this.activeAxisDrag;
+    const mesh = this.boardMeshes.get(drag.boardId);
+    if (!mesh) return;
+
+    const pointerDelta = new THREE.Vector2(event.clientX - drag.originClient.x, event.clientY - drag.originClient.y);
+    const movementOnAxisPx = pointerDelta.dot(drag.axisScreenDirection);
+    const pxPerStep = 18;
+    const movementMm = Math.round(movementOnAxisPx / pxPerStep) * drag.snapStepMm;
+
+    const nextPosition = drag.originWorldPosition.clone();
+    nextPosition[drag.axis === 'x_mm' ? 'x' : drag.axis === 'y_mm' ? 'y' : 'z'] += movementMm;
+
+    this.onBoardMoved(drag.boardId, {
+      [drag.axis]: nextPosition[drag.axis === 'x_mm' ? 'x' : drag.axis === 'y_mm' ? 'y' : 'z'],
+    } as Partial<BoardPosition>);
+  };
+
+  private handleWindowPointerUp = (): void => {
+    if (!this.activeAxisDrag) return;
+    this.activeAxisDrag = null;
+    this.controls.enabled = true;
+    document.body.classList.remove('axis-dragging');
   };
 
   private handlePointerDown = (event: PointerEvent): void => {
-    if (this.transformControls.dragging) {
+    if (this.activeAxisDrag) {
       return;
     }
     const rect = this.renderer.domElement.getBoundingClientRect();

@@ -179,13 +179,15 @@ export function createApp(root: HTMLElement): void {
             <div class="move-pad-grid">
               ${AXIS_BUTTONS.map(
                 ({ axis, label, colorClass }) => `
-                  <div class="move-axis-group">
-                    <button class="${colorClass}" data-move="${axis}:1">${label}+</button>
-                    <button class="${colorClass}" data-move="${axis}:-1">${label}-</button>
+                  <div class="move-axis-group ${colorClass}">
+                    <button class="move-step" data-move="${axis}:-1">${label}−</button>
+                    <button class="move-drag" data-drag-axis="${axis}" title="Hold and drag to move along ${label}">${label} drag</button>
+                    <button class="move-step" data-move="${axis}:1">${label}+</button>
                   </div>
                 `,
               ).join('')}
             </div>
+            <small class="move-pad-hint">Tap ± for one snap step, or hold the middle block and drag the mouse to move along that axis.</small>
           </div>
         </section>
         <aside class="panel properties-panel" data-properties-panel></aside>
@@ -335,6 +337,17 @@ export function createApp(root: HTMLElement): void {
     });
   });
 
+  root.querySelectorAll<HTMLButtonElement>('[data-drag-axis]').forEach((button) => {
+    button.addEventListener('pointerdown', (event) => {
+      const axis = button.dataset.dragAxis as 'x_mm' | 'y_mm' | 'z_mm';
+      const selectedBoardId = store.getState().selectedBoardId;
+      if (!selectedBoardId) return;
+      event.preventDefault();
+      button.setPointerCapture?.(event.pointerId);
+      scene.beginAxisDrag(axis, selectedBoardId, event.clientX, event.clientY, store.getState().project.settings.snapStepMm);
+    });
+  });
+
   gridToggle.addEventListener('change', () => {
     const current = store.getState().project.settings;
     store.updateProject({ settings: { ...current, gridVisible: gridToggle.checked } });
@@ -419,8 +432,9 @@ export function createApp(root: HTMLElement): void {
       .map(
         (board) => `
           <button class="board-row ${board.id === state.selectedBoardId ? 'selected' : ''}" data-board-id="${board.id}">
-            <strong contenteditable="true" data-rename-id="${board.id}">${board.name}</strong>
-            <span>${board.role} · ${board.orientation}</span>
+            <strong contenteditable="true" data-board-name="${board.id}">${board.name}</strong>
+            <span>${board.role}</span>
+            <small>${board.width_mm} × ${board.height_mm} × ${board.thickness_mm} mm</small>
           </button>
         `,
       )
@@ -430,24 +444,25 @@ export function createApp(root: HTMLElement): void {
       element.addEventListener('click', () => store.setSelectedBoard(element.dataset.boardId ?? null));
     });
 
-    boardList.querySelectorAll<HTMLElement>('[data-rename-id]').forEach((element) => {
+    boardList.querySelectorAll<HTMLElement>('[data-board-name]').forEach((element) => {
       element.addEventListener('blur', () => {
-        const id = element.dataset.renameId;
-        if (id) store.updateBoard(id, { name: element.textContent?.trim() || 'Board' });
+        const id = element.dataset.boardName;
+        if (id) {
+          store.updateBoard(id, { name: element.textContent?.trim() || 'Board' });
+        }
       });
     });
   };
 
   store.subscribe((state) => {
-    scene.setGridVisible(state.project.settings.gridVisible);
-    scene.renderBoards(state.project.boards, state.selectedBoardId);
-    renderBoardList(state);
-    renderProperties(state.project.boards.find((board) => board.id === state.selectedBoardId));
     projectNameInput.value = state.project.name;
     projectThicknessInput.value = String(state.project.board_thickness_mm);
     gridToggle.checked = state.project.settings.gridVisible;
     snapSelect.value = String(state.project.settings.snapStepMm);
+    renderBoardList(state);
+    renderProperties(state.project.boards.find((board) => board.id === state.selectedBoardId));
+    scene.setGridVisible(state.project.settings.gridVisible);
+    scene.renderBoards(state.project.boards, state.selectedBoardId);
   });
-
   window.addEventListener('beforeunload', () => scene.dispose(), { once: true });
 }
