@@ -182,11 +182,14 @@ button { cursor: pointer; }
   right: 1rem;
   display: flex;
   flex-direction: column;
+  align-items: stretch;
   gap: 0.45rem;
 }
 .viewport-toggle {
   display: inline-flex;
   align-items: center;
+  justify-content: flex-start;
+  width: 180px;
   gap: 0.55rem;
   padding: 0.65rem 0.8rem;
   border-radius: 10px;
@@ -195,7 +198,6 @@ button { cursor: pointer; }
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.24);
   user-select: none;
 }
-.viewport-toggle--nested { margin-left: 1rem; }
 .viewport-toggle input { margin: 0; }
 .viewport-toggle:has(input:disabled) { opacity: 0.55; }
 
