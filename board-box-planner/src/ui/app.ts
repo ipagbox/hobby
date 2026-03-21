@@ -148,12 +148,7 @@ function createCustomGenerationModal(config: CustomBoxConfig, errors: Partial<Re
             <label class="check-option"><input data-custom-doors-enabled type="checkbox" ${config.doors.enabled ? 'checked' : ''} /> <span>Front doors</span></label>
             ${config.doors.enabled ? `
               <div class="form-grid compact-grid nested-grid">
-                <label><span>Count</span>
-                  <select data-custom-door-count>
-                    <option value="1" ${config.doors.count === 1 ? 'selected' : ''}>1</option>
-                    <option value="2" ${config.doors.count === 2 ? 'selected' : ''}>2</option>
-                  </select>
-                </label>
+                <label><span>Count</span><input data-custom-number="doorCount" type="number" min="1" step="1" value="${config.doors.count}" />${fieldError('doorCount')}</label>
                 <label><span>Top/bottom gap, mm</span><input data-custom-number="verticalGapMm" type="number" min="0" step="1" value="${config.doors.verticalGapMm}" />${fieldError('verticalGapMm')}</label>
                 <label><span>Side gap / center gap, mm</span><input data-custom-number="horizontalGapMm" type="number" min="0" step="1" value="${config.doors.horizontalGapMm}" />${fieldError('horizontalGapMm')}</label>
               </div>
@@ -306,21 +301,34 @@ export function createApp(root: HTMLElement): void {
       });
     });
 
+    const applyCustomNumberValue = (key: string, rawValue: string): void => {
+      const value = Number(rawValue);
+      if (Number.isNaN(value)) return;
+
+      if (key === 'verticalGapMm' || key === 'horizontalGapMm') {
+        customConfig = { ...customConfig, doors: { ...customConfig.doors, [key]: value } };
+      } else if (key === 'doorCount') {
+        customConfig = { ...customConfig, doors: { ...customConfig.doors, count: value } };
+      } else if (key === 'verticalDividerCount') {
+        customConfig = { ...customConfig, dividers: { ...customConfig.dividers, verticalCount: value } };
+      } else if (key === 'horizontalDividerCount') {
+        customConfig = { ...customConfig, dividers: { ...customConfig.dividers, horizontalCount: value } };
+      } else if (key === 'frontGapMm') {
+        customConfig = { ...customConfig, dividers: { ...customConfig.dividers, frontGapMm: value } };
+      } else {
+        customConfig = { ...customConfig, [key]: value } as CustomBoxConfig;
+      }
+    };
+
     modal.querySelectorAll<HTMLInputElement>('[data-custom-number]').forEach((input) => {
-      input.addEventListener('input', () => {
-        const key = input.dataset.customNumber as string;
-        const value = Number(input.value);
-        if (key === 'verticalGapMm' || key === 'horizontalGapMm') {
-          customConfig = { ...customConfig, doors: { ...customConfig.doors, [key]: value } };
-        } else if (key === 'verticalDividerCount') {
-          customConfig = { ...customConfig, dividers: { ...customConfig.dividers, verticalCount: value } };
-        } else if (key === 'horizontalDividerCount') {
-          customConfig = { ...customConfig, dividers: { ...customConfig.dividers, horizontalCount: value } };
-        } else if (key === 'frontGapMm') {
-          customConfig = { ...customConfig, dividers: { ...customConfig.dividers, frontGapMm: value } };
-        } else {
-          customConfig = { ...customConfig, [key]: value } as CustomBoxConfig;
-        }
+      input.addEventListener('blur', () => {
+        applyCustomNumberValue(input.dataset.customNumber as string, input.value);
+        renderCustomModal();
+      });
+
+      input.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter') return;
+        applyCustomNumberValue(input.dataset.customNumber as string, input.value);
         renderCustomModal();
       });
     });
@@ -353,11 +361,6 @@ export function createApp(root: HTMLElement): void {
       renderCustomModal();
     });
 
-    const doorCount = modal.querySelector<HTMLSelectElement>('[data-custom-door-count]');
-    doorCount?.addEventListener('change', () => {
-      customConfig = { ...customConfig, doors: { ...customConfig.doors, count: Number(doorCount.value) as 1 | 2 } };
-      renderCustomModal();
-    });
 
     modal.querySelector<HTMLButtonElement>('[data-custom-confirm]')?.addEventListener('click', () => {
       const latestValidation = validateCustomBoxConfig(customConfig);

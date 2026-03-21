@@ -21,7 +21,7 @@ export interface CustomBoxConfig {
   backWallInsetMm: number;
   doors: {
     enabled: boolean;
-    count: 1 | 2;
+    count: number;
     verticalGapMm: number;
     horizontalGapMm: number;
   };
@@ -48,6 +48,16 @@ function getInnerBottomOffset(config: CustomBoxConfig): number { return config.w
 function getInsideBackOffset(config: CustomBoxConfig): number { return config.walls.back && config.backWallMode === 'inside' ? config.backThicknessMm : 0; }
 function getInteriorDepth(config: CustomBoxConfig): number { return config.depthMm - getInsideBackOffset(config); }
 function getDividerDepth(config: CustomBoxConfig): number { return getInteriorDepth(config) - config.dividers.frontGapMm; }
+
+const MIN_DOOR_WIDTH_MM = 100;
+
+function getDoorTotalHorizontalGap(config: CustomBoxConfig): number {
+  return config.doors.horizontalGapMm * (config.doors.count + 1);
+}
+
+function getDoorWidth(config: CustomBoxConfig): number {
+  return (config.widthMm - getDoorTotalHorizontalGap(config)) / config.doors.count;
+}
 
 function getDistributedCenters(start: number, totalSpan: number, itemSize: number, count: number): number[] {
   if (count <= 0) return [];
@@ -107,15 +117,22 @@ export function validateCustomBoxConfig(config: CustomBoxConfig): CustomBoxValid
   if (config.dividers.horizontalCount > 0 && !(innerHeight - config.dividers.horizontalCount * config.mainThicknessMm > 0)) errors.horizontalDividerCount = 'Too many horizontal dividers for the available inner height.';
 
   if (config.doors.enabled) {
+    if (!Number.isInteger(config.doors.count) || config.doors.count < 1) errors.doorCount = 'Door count must be a positive integer.';
     if (config.doors.verticalGapMm < 0) errors.verticalGapMm = 'Vertical gap cannot be negative.';
     if (config.doors.horizontalGapMm < 0) errors.horizontalGapMm = 'Horizontal gap cannot be negative.';
 
     const doorHeight = config.heightMm - config.doors.verticalGapMm * 2;
     if (!(doorHeight > 0)) errors.verticalGapMm = 'Vertical gap leaves no space for doors.';
 
-    const totalHorizontalGaps = config.doors.count === 1 ? config.doors.horizontalGapMm * 2 : config.doors.horizontalGapMm * 3;
-    const availableDoorWidth = config.widthMm - totalHorizontalGaps;
-    if (!(availableDoorWidth > 0)) errors.horizontalGapMm = 'Horizontal gap leaves no space for doors.';
+    const availableDoorWidth = config.widthMm - getDoorTotalHorizontalGap(config);
+    if (!(availableDoorWidth > 0)) {
+      errors.horizontalGapMm = 'Horizontal gaps leave no space for doors.';
+    } else if (!errors.doorCount) {
+      const doorWidth = availableDoorWidth / config.doors.count;
+      if (!(doorWidth >= MIN_DOOR_WIDTH_MM)) {
+        errors.doorCount = `Too many doors for the width: each door must be at least ${MIN_DOOR_WIDTH_MM} mm wide.`;
+      }
+    }
   }
 
   return { isValid: Object.keys(errors).length === 0, errors };
@@ -204,13 +221,26 @@ export function generateCustomBoxBoards(config: CustomBoxConfig, globalThickness
 
   if (config.doors.enabled) {
     const doorHeight = config.heightMm - config.doors.verticalGapMm * 2;
-    if (config.doors.count === 1) {
-      const doorWidth = config.widthMm - config.doors.horizontalGapMm * 2;
-      boards.push(createBoard({ name: 'Front door', role: 'door', orientation: 'XY', material: 'Birch plywood', width_mm: doorWidth, height_mm: doorHeight, thickness_mm: config.mainThicknessMm, x_mm: config.widthMm / 2, y_mm: config.doors.verticalGapMm + doorHeight / 2, z_mm: -config.mainThicknessMm / 2 }, globalThicknessMm));
-    } else {
-      const doorWidth = (config.widthMm - config.doors.horizontalGapMm * 3) / 2;
-      boards.push(createBoard({ name: 'Left door', role: 'door', orientation: 'XY', material: 'Birch plywood', width_mm: doorWidth, height_mm: doorHeight, thickness_mm: config.mainThicknessMm, x_mm: config.doors.horizontalGapMm + doorWidth / 2, y_mm: config.doors.verticalGapMm + doorHeight / 2, z_mm: -config.mainThicknessMm / 2 }, globalThicknessMm));
-      boards.push(createBoard({ name: 'Right door', role: 'door', orientation: 'XY', material: 'Birch plywood', width_mm: doorWidth, height_mm: doorHeight, thickness_mm: config.mainThicknessMm, x_mm: config.doors.horizontalGapMm * 2 + doorWidth + doorWidth / 2, y_mm: config.doors.verticalGapMm + doorHeight / 2, z_mm: -config.mainThicknessMm / 2 }, globalThicknessMm));
+    const doorWidth = getDoorWidth(config);
+
+    for (let doorIndex = 0; doorIndex < config.doors.count; doorIndex += 1) {
+      const x = config.doors.horizontalGapMm + doorIndex * (doorWidth + config.doors.horizontalGapMm) + doorWidth / 2;
+      const name = config.doors.count === 1
+        ? 'Front door'
+        : `Door ${doorIndex + 1}`;
+
+      boards.push(createBoard({
+        name,
+        role: 'door',
+        orientation: 'XY',
+        material: 'Birch plywood',
+        width_mm: doorWidth,
+        height_mm: doorHeight,
+        thickness_mm: config.mainThicknessMm,
+        x_mm: x,
+        y_mm: config.doors.verticalGapMm + doorHeight / 2,
+        z_mm: -config.mainThicknessMm / 2,
+      }, globalThicknessMm));
     }
   }
 
