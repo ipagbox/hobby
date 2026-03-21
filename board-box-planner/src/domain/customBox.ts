@@ -51,6 +51,17 @@ function getDividerDepth(config: CustomBoxConfig): number { return getInteriorDe
 
 const MIN_DOOR_WIDTH_MM = 100;
 
+const GENERATED_MODEL_OFFSET_MM = 10;
+
+function offsetBoard(board: Board, offsetMm = GENERATED_MODEL_OFFSET_MM): Board {
+  return createBoard({
+    ...board,
+    x_mm: board.x_mm + offsetMm,
+    y_mm: board.y_mm + offsetMm,
+    z_mm: board.z_mm + offsetMm,
+  }, board.thickness_mm);
+}
+
 function getDoorTotalHorizontalGap(config: CustomBoxConfig): number {
   return config.doors.horizontalGapMm * (config.doors.count + 1);
 }
@@ -244,5 +255,6 @@ export function generateCustomBoxBoards(config: CustomBoxConfig, globalThickness
     }
   }
 
-  return { boards };
+  return { boards: boards.map((board) => offsetBoard(board)) };
 }
+

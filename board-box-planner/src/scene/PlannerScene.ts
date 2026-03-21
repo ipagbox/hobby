@@ -254,7 +254,7 @@ export class PlannerScene {
     this.boardMeshes.forEach((entry) => {
       if (!entry.isDoor) return;
       entry.targetDoorAngle = enabled
-        ? (entry.doorDirection === 'right' ? DOOR_OPEN_ANGLE : -DOOR_OPEN_ANGLE)
+        ? (entry.doorDirection === 'right' ? -DOOR_OPEN_ANGLE : DOOR_OPEN_ANGLE)
         : 0;
     });
   }
@@ -297,7 +297,7 @@ export class PlannerScene {
             board,
             isDoor: true,
             currentDoorAngle: 0,
-            targetDoorAngle: this.openDoors ? (doorDirection === 'right' ? DOOR_OPEN_ANGLE : -DOOR_OPEN_ANGLE) : 0,
+            targetDoorAngle: this.openDoors ? (doorDirection === 'right' ? -DOOR_OPEN_ANGLE : DOOR_OPEN_ANGLE) : 0,
             doorDirection,
           };
           pivot.add(mesh);
@@ -326,7 +326,7 @@ export class PlannerScene {
           const hingeOffset = doorDirection === 'right' ? size[0] / 2 : -size[0] / 2;
           mesh.position.set(-hingeOffset, 0, 0);
           entry.root.visible = !this.hideDoors;
-          entry.targetDoorAngle = this.openDoors ? (doorDirection === 'right' ? DOOR_OPEN_ANGLE : -DOOR_OPEN_ANGLE) : 0;
+          entry.targetDoorAngle = this.openDoors ? (doorDirection === 'right' ? -DOOR_OPEN_ANGLE : DOOR_OPEN_ANGLE) : 0;
         }
       }
 
