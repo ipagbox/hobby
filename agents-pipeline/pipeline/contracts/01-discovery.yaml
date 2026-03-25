@@ -1,0 +1,40 @@
+stage_id: "01-discovery"
+name: "Discovery / Market Research"
+role: "Market Research Analyst"
+
+goal: |
+  Сформировать гипотезы о целевой аудитории, ключевых услугах, офферах,
+  сегментах и контексте локального рынка на основе project brief.
+
+inputs:
+  - key: project_brief
+    path: "stages/00-normalize/current/project-brief.yaml"
+    required: true
+    schema: "schemas/project-brief.schema.json"
+    description: "Нормализованный project brief"
+
+outputs:
+  - key: discovery_report
+    path: "stages/01-discovery/current/discovery-report.md"
+    schema: null
+    description: "Отчёт об исследовании рынка и гипотезах"
+
+allowed_sources:
+  - artifact       # project brief
+  - reasoning      # LLM reasoning и общие знания о рынке
+  - web_search     # поиск данных о рынке (если доступен)
+
+review_required: false
+
+completion_criteria:
+  - "Определены минимум 2 сегмента целевой аудитории"
+  - "Описаны ключевые боли и потребности каждого сегмента"
+  - "Перечислены основные услуги / офферы"
+  - "Сформулирован контекст локального рынка (город, конкуренция, сезонность)"
+  - "Выделены 3-5 гипотез для проверки"
+  - "Определены каналы привлечения клиентов"
+
+risks:
+  - "Гипотезы основаны на общих знаниях, не на реальных данных клиента"
+  - "Локальная специфика рынка может отличаться от общих паттернов"
+  - "Сегменты ЦА требуют валидации с клиентом"

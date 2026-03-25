@@ -1,0 +1,52 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "run-metadata.schema.json",
+  "title": "Run Metadata",
+  "description": "Метаданные pipeline run: состояние, прогресс по stages.",
+  "type": "object",
+  "required": ["run_id", "project_name", "created_at", "status", "stages"],
+  "properties": {
+    "run_id": {
+      "type": "string",
+      "description": "Уникальный ID run (slug + datetime + random suffix)"
+    },
+    "project_name": { "type": "string" },
+    "project_type": {
+      "type": "string",
+      "enum": ["local_business_website", "landing", "corporate"]
+    },
+    "brief_path": {
+      "type": "string",
+      "description": "Путь к входному brief файлу"
+    },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "status": {
+      "type": "string",
+      "enum": ["pending", "in_progress", "completed", "failed", "partial"],
+      "description": "Общий статус run"
+    },
+    "stages": {
+      "type": "object",
+      "description": "Состояние каждого stage. Ключ — stage_id.",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["status", "versions", "current_version"],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["pending", "in_progress", "completed", "failed", "review_required", "skipped"]
+          },
+          "versions": { "type": "integer", "minimum": 0 },
+          "current_version": { "type": "integer", "minimum": 0 },
+          "started_at": { "type": "string", "format": "date-time" },
+          "completed_at": { "type": "string", "format": "date-time" },
+          "model": { "type": "string", "description": "LLM модель использованная в stage" },
+          "input_tokens": { "type": "integer" },
+          "output_tokens": { "type": "integer" },
+          "error": { "type": "string" }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "brief.schema.json",
+  "title": "Raw Business Brief",
+  "description": "Входной бизнес-бриф от пользователя. Минимальный набор полей.",
+  "type": "object",
+  "required": ["business"],
+  "properties": {
+    "project_type": {
+      "type": "string",
+      "enum": ["local_business_website", "landing", "corporate"],
+      "description": "Тип проекта. Если не указан — определяется в 00-normalize."
+    },
+    "business": {
+      "type": "object",
+      "required": ["name", "type"],
+      "properties": {
+        "name": { "type": "string", "description": "Название компании" },
+        "type": { "type": "string", "description": "Сфера деятельности" },
+        "city": { "type": "string", "description": "Город работы" },
+        "district": { "type": "string", "description": "Район / зона охвата" },
+        "description": { "type": "string", "description": "Свободное описание бизнеса" }
+      }
+    },
+    "goals": {
+      "type": "object",
+      "properties": {
+        "primary": { "type": "string", "description": "Главная цель сайта" },
+        "secondary": { "type": "string", "description": "Дополнительные цели" }
+      }
+    },
+    "constraints": {
+      "type": "object",
+      "properties": {
+        "budget": {
+          "type": "string",
+          "enum": ["low", "medium", "high"],
+          "description": "Бюджетный уровень"
+        },
+        "timeline": { "type": "string", "description": "Примерные сроки" },
+        "tech": { "type": "string", "description": "Технические предпочтения" }
+      }
+    },
+    "notes": {
+      "type": "string",
+      "description": "Свободные заметки"
+    }
+  }
+}

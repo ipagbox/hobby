@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "artifact-index.schema.json",
+  "title": "Artifact Index",
+  "description": "Индекс всех артефактов созданных в рамках run.",
+  "type": "object",
+  "required": ["run_id", "updated_at", "artifacts"],
+  "properties": {
+    "run_id": { "type": "string" },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["stage_id", "key", "path", "version", "status"],
+        "properties": {
+          "stage_id": { "type": "string" },
+          "key": { "type": "string", "description": "Ключ из output contract" },
+          "path": { "type": "string", "description": "Путь относительно run directory" },
+          "version": { "type": "integer" },
+          "created_at": { "type": "string", "format": "date-time" },
+          "status": {
+            "type": "string",
+            "enum": ["created", "validated", "review_required", "rejected"]
+          },
+          "size_bytes": { "type": "integer" },
+          "schema_valid": { "type": "boolean" }
+        }
+      }
+    }
+  }
+}

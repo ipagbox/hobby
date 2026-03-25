@@ -1,0 +1,61 @@
+stage_id: "06-content-model"
+name: "Content Model / Page Briefs"
+role: "Content Strategist"
+
+goal: |
+  Создать модель контента: типы страниц, поля, структуру секций.
+  Для каждой страницы — детальный page brief с целью, ЦА, keyword cluster,
+  структурой секций и рекомендациями по контенту.
+
+inputs:
+  - key: project_brief
+    path: "stages/00-normalize/current/project-brief.yaml"
+    required: true
+    schema: "schemas/project-brief.schema.json"
+
+  - key: sitemap
+    path: "stages/04-ia/current/sitemap.md"
+    required: true
+    schema: null
+
+  - key: page_types
+    path: "stages/04-ia/current/page-types.md"
+    required: true
+    schema: null
+
+  - key: keyword_map
+    path: "stages/03-seo/current/keyword-map.md"
+    required: true
+    schema: null
+
+  - key: design_brief
+    path: "stages/05-design/current/design-system-brief.md"
+    required: false
+    schema: null
+
+outputs:
+  - key: content_model
+    path: "stages/06-content-model/current/content-model.md"
+    schema: null
+    description: "Модель контента: типы страниц и поля"
+
+  - key: page_briefs
+    path: "stages/06-content-model/current/page-briefs.md"
+    schema: null
+    description: "Детальный бриф для каждой страницы"
+
+allowed_sources:
+  - artifact
+  - reasoning
+
+review_required: false
+
+completion_criteria:
+  - "Каждая страница из sitemap имеет page brief"
+  - "Каждый page brief содержит: цель, ЦА, keyword cluster, секции, CTA"
+  - "Для каждой секции: название, тип компонента, рекомендуемый контент"
+  - "SEO-мета задана для каждой страницы (title template, description template)"
+  - "Контентные приоритеты расставлены"
+
+risks:
+  - "Слишком детальные briefs могут оказаться избыточными для простых страниц"

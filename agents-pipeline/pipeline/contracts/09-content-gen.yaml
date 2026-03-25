@@ -1,0 +1,65 @@
+stage_id: "09-content-gen"
+name: "Content Generation"
+role: "Content Writer"
+
+goal: |
+  Написать реальный контент для всех страниц на основе page briefs
+  и keyword clusters. Не шаблонный текст, а конкретный контент
+  для конкретного бизнеса в конкретном городе.
+
+inputs:
+  - key: project_brief
+    path: "stages/00-normalize/current/project-brief.yaml"
+    required: true
+    schema: "schemas/project-brief.schema.json"
+
+  - key: page_briefs
+    path: "stages/06-content-model/current/page-briefs.md"
+    required: true
+    schema: null
+
+  - key: keyword_map
+    path: "stages/03-seo/current/keyword-map.md"
+    required: true
+    schema: null
+
+  - key: design_brief
+    path: "stages/05-design/current/design-system-brief.md"
+    required: false
+    schema: null
+
+  - key: discovery_report
+    path: "stages/01-discovery/current/discovery-report.md"
+    required: false
+    schema: null
+
+outputs:
+  - key: content_pages
+    path: "stages/09-content-gen/current/pages/"
+    schema: null
+    description: "Папка с .md файлами контента для каждой страницы"
+
+  - key: content_index
+    path: "stages/09-content-gen/current/content-index.md"
+    schema: null
+    description: "Индекс всех созданных страниц контента"
+
+allowed_sources:
+  - artifact
+  - reasoning
+
+review_required: false
+
+completion_criteria:
+  - "Контент создан для каждой страницы из sitemap"
+  - "В тексте использованы ключевые запросы из keyword clusters (органично)"
+  - "Заголовки (H1, H2) соответствуют SEO-рекомендациям"
+  - "Tone of voice соответствует design brief"
+  - "Каждая страница содержит CTA"
+  - "Текст конкретный: есть название компании, город, конкретные услуги"
+  - "content-index.md создан"
+
+risks:
+  - "LLM может писать обобщённый текст — промпт требует жёсткой конкретики"
+  - "Контент требует финальной вычитки перед публикацией"
+  - "Ключевые слова не должны быть встроены неестественно (переспам)"

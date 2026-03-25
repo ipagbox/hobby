@@ -1,0 +1,53 @@
+stage_id: "08-backend"
+name: "Backend / CMS / Lead Capture"
+role: "Backend Engineer"
+
+goal: |
+  Реализовать серверную логику: форму захвата лидов, email-уведомления,
+  CMS-конфигурацию или serverless функции. Ориентир — минимально необходимое
+  для запуска продуктивного сайта.
+
+inputs:
+  - key: project_brief
+    path: "stages/00-normalize/current/project-brief.yaml"
+    required: true
+    schema: "schemas/project-brief.schema.json"
+
+  - key: frontend_plan
+    path: "stages/07-frontend/current/frontend-plan.md"
+    required: true
+    schema: null
+
+  - key: page_briefs
+    path: "stages/06-content-model/current/page-briefs.md"
+    required: true
+    schema: null
+
+outputs:
+  - key: backend_plan
+    path: "stages/08-backend/current/backend-plan.md"
+    schema: null
+    description: "Архитектурный план бэкенда + инструкции по деплою"
+
+  - key: backend_src
+    path: "stages/08-backend/current/src/"
+    schema: null
+    description: "Серверный код (если применимо)"
+
+allowed_sources:
+  - artifact
+  - reasoning
+
+review_required: false
+
+completion_criteria:
+  - "Определён тип бэкенда (static + Formspree | serverless | full backend)"
+  - "Форма лидогенерации реализована"
+  - "Инструкции по деплою написаны"
+  - "Переменные окружения задокументированы"
+  - "backend-plan.md создан"
+
+risks:
+  - "Выбор бэкенда зависит от бюджета и хостинга клиента"
+  - "Email-уведомления требуют реального тестирования"
+  - "Serverless функции требуют настройки окружения"

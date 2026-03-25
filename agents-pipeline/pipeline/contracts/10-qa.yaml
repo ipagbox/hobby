@@ -1,0 +1,91 @@
+stage_id: "10-qa"
+name: "QA / SEO Audit / Final Report"
+role: "QA & SEO Auditor"
+
+goal: |
+  Проверить полноту и связность всех артефактов run.
+  Создать финальный отчёт с итогами, рисками и чеклистом для запуска.
+
+inputs:
+  - key: project_brief
+    path: "stages/00-normalize/current/project-brief.yaml"
+    required: true
+    schema: "schemas/project-brief.schema.json"
+
+  - key: discovery_report
+    path: "stages/01-discovery/current/discovery-report.md"
+    required: true
+    schema: null
+
+  - key: keyword_map
+    path: "stages/03-seo/current/keyword-map.md"
+    required: true
+    schema: null
+
+  - key: sitemap
+    path: "stages/04-ia/current/sitemap.md"
+    required: true
+    schema: null
+
+  - key: design_brief
+    path: "stages/05-design/current/design-system-brief.md"
+    required: true
+    schema: null
+
+  - key: page_briefs
+    path: "stages/06-content-model/current/page-briefs.md"
+    required: true
+    schema: null
+
+  - key: frontend_plan
+    path: "stages/07-frontend/current/frontend-plan.md"
+    required: false
+    schema: null
+
+  - key: backend_plan
+    path: "stages/08-backend/current/backend-plan.md"
+    required: false
+    schema: null
+
+  - key: content_index
+    path: "stages/09-content-gen/current/content-index.md"
+    required: false
+    schema: null
+
+outputs:
+  - key: launch_checklist
+    path: "stages/10-qa/current/launch-checklist.md"
+    schema: null
+    description: "Чеклист готовности к запуску"
+
+  - key: final_report
+    path: "stages/10-qa/current/final-report.md"
+    schema: null
+    description: "Финальный отчёт: итоги run, риски, что требует ручной проверки"
+
+  - key: seo_audit
+    path: "stages/10-qa/current/seo-audit.md"
+    schema: null
+    description: "SEO-аудит созданных артефактов"
+
+allowed_sources:
+  - artifact       # все артефакты run
+  - reasoning
+
+review_required: true
+review_reason: |
+  Финальный отчёт — точка принятия решения о запуске.
+  Требует ручной проверки выявленных рисков и чеклиста.
+
+completion_criteria:
+  - "Проверены все артефакты run на наличие"
+  - "SEO аудит: title/description/H1 для каждой страницы"
+  - "launch-checklist.md создан с разбивкой по категориям"
+  - "final-report.md содержит: итоги, риски, что готово, что нет"
+  - "Список пунктов для ручной проверки выделен явно"
+  - "Recommendations для следующих итераций сформулированы"
+
+risks:
+  - "QA без реального браузера не может проверить визуальное качество"
+  - "SEO-аудит без Google Search Console не даёт реальных данных"
+  - "Чеклист запуска должен быть адаптирован под конкретный хостинг"

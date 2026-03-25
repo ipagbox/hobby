@@ -1,0 +1,79 @@
+# Нормализованный project brief — Stage 00-normalize
+# Пример артефакта для сантехнической компании
+
+project_id: "santehnika-moskva-20260325"
+project_type: "local_business_website"
+created_at: "2026-03-25T10:01:30Z"
+
+business:
+  name: "Сантехника Мастер"
+  type: "Сантехнические услуги"
+  city: "Москва"
+  district: "Юго-Западный административный округ"
+  description: >
+    Бригада из 3 опытных мастеров-сантехников. Работаем по всей Москве.
+    Основные услуги: монтаж и замена труб, установка и ремонт сантехники,
+    устранение засоров и течей, установка водяных фильтров, работа с тёплыми
+    полами. Стаж работы 8 лет, более 500 выполненных объектов.
+  phone: "[ТЕЛЕФОН — уточнить у клиента]"
+  email: "[EMAIL — уточнить у клиента]"
+  working_hours: "Без выходных, с 8:00 до 22:00"
+  founded_year: 2018
+  team_size: 3
+
+services:
+  - name: "Монтаж и замена труб"
+    category: "installation"
+    value_for_client: "Надёжная замена устаревших труб без переделок"
+  - name: "Установка и ремонт сантехники"
+    category: "installation"
+    value_for_client: "Профессиональный монтаж унитазов, ванн, раковин, смесителей"
+  - name: "Устранение засоров и течей"
+    category: "repair"
+    value_for_client: "Быстрый выезд, решение проблемы в день звонка"
+  - name: "Установка водяных фильтров"
+    category: "installation"
+    value_for_client: "Чистая вода без привкуса и запаха"
+  - name: "Тёплые полы (водяные)"
+    category: "installation"
+    value_for_client: "Комфорт и экономия на отоплении"
+
+goals:
+  primary: "Генерация заявок через сайт (звонки и форма обратной связи)"
+  secondary: "Формирование доверия через портфолио работ и отзывы клиентов"
+  kpi_primary: "Количество заявок в месяц"
+  kpi_secondary: "Время на сайте, просмотры портфолио"
+
+target_geography:
+  primary: "Москва — весь город"
+  secondary: "ЮЗАО — приоритет (ближайший район)"
+
+constraints:
+  budget: "low"
+  budget_details: "Нет бюджета на CMS и платные сервисы"
+  timeline: "2 weeks"
+  tech: "static site preferred, no CMS needed"
+
+tech_stack_recommendation:
+  frontend: "HTML + CSS + vanilla JS (без фреймворков)"
+  backend: "Formspree или Web3Forms для формы захвата (бесплатный тариф)"
+  hosting: "GitHub Pages или Netlify (бесплатно)"
+  cms: null
+
+assumptions:
+  - id: "A1"
+    field: "phone"
+    assumption: "Номер телефона не указан в брифе — использован placeholder [ТЕЛЕФОН]"
+    confidence: "certain"
+  - id: "A2"
+    field: "working_hours"
+    assumption: "Клиент указал 'работают без выходных' — добавлены часы 8:00-22:00 как типичные для данной ниши"
+    confidence: "medium"
+  - id: "A3"
+    field: "founded_year"
+    assumption: "Стаж 8 лет в 2026 году → основание в 2018 году"
+    confidence: "high"
+  - id: "A4"
+    field: "target_geography"
+    assumption: "Работают по всей Москве, но ЮЗАО указан как район базирования — выделен как приоритет"
+    confidence: "high"

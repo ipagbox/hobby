@@ -1,0 +1,58 @@
+stage_id: "07-frontend"
+name: "Frontend Implementation"
+role: "Frontend Engineer"
+
+goal: |
+  Реализовать HTML/CSS/JS для всех страниц на основе дизайн-брифа,
+  page briefs и IA. Создать работающий статический сайт.
+
+inputs:
+  - key: project_brief
+    path: "stages/00-normalize/current/project-brief.yaml"
+    required: true
+    schema: "schemas/project-brief.schema.json"
+
+  - key: design_brief
+    path: "stages/05-design/current/design-system-brief.md"
+    required: true
+    schema: null
+
+  - key: sitemap
+    path: "stages/04-ia/current/sitemap.md"
+    required: true
+    schema: null
+
+  - key: page_briefs
+    path: "stages/06-content-model/current/page-briefs.md"
+    required: true
+    schema: null
+
+outputs:
+  - key: frontend_plan
+    path: "stages/07-frontend/current/frontend-plan.md"
+    schema: null
+    description: "Технический план фронтенда: стек, структура файлов, компоненты"
+
+  - key: frontend_src
+    path: "stages/07-frontend/current/src/"
+    schema: null
+    description: "Исходный код фронтенда (HTML, CSS, JS файлы)"
+
+allowed_sources:
+  - artifact
+  - reasoning
+
+review_required: false
+
+completion_criteria:
+  - "Все страницы из sitemap реализованы (HTML файлы)"
+  - "CSS реализует цветовую палитру и типографику из design brief"
+  - "Компоненты (hero, cards, form, testimonials) реализованы"
+  - "Адаптивная верстка (mobile-first)"
+  - "Формы сверстаны (без backend логики)"
+  - "frontend-plan.md содержит список созданных файлов"
+
+risks:
+  - "LLM может создать неполный или нерабочий CSS/JS"
+  - "Адаптивность требует ручной проверки в браузере"
+  - "Большое количество страниц может быть реализовано не полностью за один pass"

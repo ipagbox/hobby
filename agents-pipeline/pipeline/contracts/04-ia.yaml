@@ -1,0 +1,52 @@
+stage_id: "04-ia"
+name: "Information Architecture / Sitemap"
+role: "Information Architect"
+
+goal: |
+  Построить структуру сайта: страницы, иерархию, навигацию, типы страниц,
+  URL-структуру. Основывается на SEO кластерах и discovery.
+
+inputs:
+  - key: project_brief
+    path: "stages/00-normalize/current/project-brief.yaml"
+    required: true
+    schema: "schemas/project-brief.schema.json"
+
+  - key: discovery_report
+    path: "stages/01-discovery/current/discovery-report.md"
+    required: true
+    schema: null
+
+  - key: keyword_map
+    path: "stages/03-seo/current/keyword-map.md"
+    required: true
+    schema: null
+
+outputs:
+  - key: sitemap
+    path: "stages/04-ia/current/sitemap.md"
+    schema: null
+    description: "Структура сайта: страницы, URL, иерархия, навигация"
+
+  - key: page_types
+    path: "stages/04-ia/current/page-types.md"
+    schema: null
+    description: "Описание типов страниц и их компонентного состава"
+
+allowed_sources:
+  - artifact       # brief + discovery + keyword map
+  - reasoning      # UX и IA best practices
+
+review_required: false
+
+completion_criteria:
+  - "Все SEO кластеры покрыты страницами"
+  - "URL структура определена и согласована с keyword clusters"
+  - "Навигация (главное меню, footer) спроектирована"
+  - "Типы страниц описаны с перечнем компонентов"
+  - "Breadcrumbs и internal linking стратегия определены"
+  - "Приоритет страниц задан (для поэтапной разработки)"
+
+risks:
+  - "Слишком широкая структура может быть не реализуема в бюджете"
+  - "URL структура должна быть согласована с клиентом до реализации"

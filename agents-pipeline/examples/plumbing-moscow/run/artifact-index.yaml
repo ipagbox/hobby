@@ -1,0 +1,23 @@
+# Пример artifact-index — снапшот первых двух stages
+# Показывает как выглядит индекс после частичного прохождения pipeline
+
+run_id: "santehnika-moskva-20260325-example"
+
+artifacts:
+  - stage_id: "00-normalize"
+    key: "project_brief"
+    path: "stages/00-normalize/current/project-brief.yaml"
+    version: 1
+    created_at: "2026-03-25T10:01:30Z"
+    status: "valid"
+    schema: "schemas/project-brief.schema.json"
+    size_bytes: 1240
+
+  - stage_id: "01-discovery"
+    key: "discovery_report"
+    path: "stages/01-discovery/current/discovery-report.md"
+    version: 1
+    created_at: "2026-03-25T10:03:20Z"
+    status: "no_schema"
+    schema: null
+    size_bytes: 3850

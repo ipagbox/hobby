@@ -1,0 +1,49 @@
+stage_id: "03-seo"
+name: "SEO / Keyword Clustering"
+role: "SEO Strategist"
+
+goal: |
+  Создать кластеры поисковых запросов, приоритизировать их,
+  сопоставить с страницами сайта и определить SEO-стратегию.
+
+inputs:
+  - key: project_brief
+    path: "stages/00-normalize/current/project-brief.yaml"
+    required: true
+    schema: "schemas/project-brief.schema.json"
+
+  - key: discovery_report
+    path: "stages/01-discovery/current/discovery-report.md"
+    required: true
+    schema: null
+
+  - key: competitor_analysis
+    path: "stages/02-competitor/current/competitor-analysis.md"
+    required: false    # необязателен если stage пропущена
+    schema: null
+
+outputs:
+  - key: keyword_map
+    path: "stages/03-seo/current/keyword-map.md"
+    schema: null
+    description: "Keyword clusters + mapping на страницы + SEO-стратегия"
+
+allowed_sources:
+  - artifact       # brief + discovery + competitor
+  - reasoning      # знания о SEO и поисковом поведении
+  - web_search     # поиск объёмов запросов (если доступен)
+
+review_required: false
+
+completion_criteria:
+  - "Сформированы минимум 5 keyword clusters"
+  - "Каждый кластер: главный запрос + LSI + интент + объём (оценка)"
+  - "Все кластеры сопоставлены со страницами (page mapping)"
+  - "Определены приоритеты кластеров (high/medium/low)"
+  - "Сформулированы мета-рекомендации (title pattern, description pattern)"
+  - "Определена стратегия для локального SEO (geo-модификаторы)"
+
+risks:
+  - "Объёмы запросов — оценочные, не реальные данные из Search Console"
+  - "Конкурентность запросов может отличаться от оценок LLM"
+  - "Для точного SEO требуются реальные данные из Ahrefs / SEMrush"

@@ -1,0 +1,36 @@
+stage_id: "00-normalize"
+name: "Project Brief Normalization"
+role: "Project Analyst"
+
+goal: |
+  Преобразовать сырой бизнес-бриф в структурированный project-brief.yaml
+  с заполнением пробелов через разумные допущения, которые явно помечены как assumptions.
+
+inputs:
+  - key: raw_brief
+    path: "brief.yaml"                    # относительно run directory
+    required: true
+    schema: "schemas/brief.schema.json"
+    description: "Входной бизнес-бриф от пользователя"
+
+outputs:
+  - key: project_brief
+    path: "stages/00-normalize/current/project-brief.yaml"
+    schema: "schemas/project-brief.schema.json"
+    description: "Нормализованный structured project brief"
+
+allowed_sources:
+  - artifact       # входной бриф
+  - reasoning      # LLM reasoning для заполнения пробелов
+
+review_required: false
+
+completion_criteria:
+  - "Все обязательные поля project-brief.schema.json заполнены"
+  - "Assumptions явно помечены секцией assumptions[]"
+  - "project_type определён (local_business_website | landing | corporate)"
+  - "Основные бизнес-цели сформулированы"
+
+risks:
+  - "Неполный бриф требует предположений — клиент должен подтвердить"
+  - "project_type может быть выбран неверно если бриф неоднозначен"

@@ -1,0 +1,76 @@
+# Пример метаданных run — снапшот первых двух stages
+# Это пример того как выглядят метаданные после частичного прохождения pipeline
+
+run_id: "santehnika-moskva-20260325-example"
+project_name: "Сантехника Мастер"
+project_type: "local_business_website"
+brief_path: "examples/plumbing-moscow/brief.yaml"
+created_at: "2026-03-25T10:00:00Z"
+updated_at: "2026-03-25T10:15:00Z"
+status: "partial"
+
+stages:
+  00-normalize:
+    status: "completed"
+    versions: 1
+    current_version: 1
+    started_at: "2026-03-25T10:00:10Z"
+    completed_at: "2026-03-25T10:01:30Z"
+    model: "claude-opus-4-6"
+    input_tokens: 1240
+    output_tokens: 820
+
+  01-discovery:
+    status: "completed"
+    versions: 1
+    current_version: 1
+    started_at: "2026-03-25T10:01:35Z"
+    completed_at: "2026-03-25T10:03:20Z"
+    model: "claude-opus-4-6"
+    input_tokens: 2100
+    output_tokens: 1850
+
+  02-competitor:
+    status: "pending"
+    versions: 0
+    current_version: 0
+
+  03-seo:
+    status: "pending"
+    versions: 0
+    current_version: 0
+
+  04-ia:
+    status: "pending"
+    versions: 0
+    current_version: 0
+
+  05-design:
+    status: "pending"
+    versions: 0
+    current_version: 0
+
+  06-content-model:
+    status: "pending"
+    versions: 0
+    current_version: 0
+
+  07-frontend:
+    status: "pending"
+    versions: 0
+    current_version: 0
+
+  08-backend:
+    status: "pending"
+    versions: 0
+    current_version: 0
+
+  09-content-gen:
+    status: "pending"
+    versions: 0
+    current_version: 0
+
+  10-qa:
+    status: "pending"
+    versions: 0
+    current_version: 0

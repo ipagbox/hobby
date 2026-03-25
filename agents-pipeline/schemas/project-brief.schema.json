@@ -1,0 +1,77 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "project-brief.schema.json",
+  "title": "Normalized Project Brief",
+  "description": "Структурированный project brief после нормализации stage 00-normalize.",
+  "type": "object",
+  "required": ["project_id", "project_type", "business", "goals", "constraints", "assumptions"],
+  "properties": {
+    "project_id": {
+      "type": "string",
+      "description": "Уникальный идентификатор проекта (slug)"
+    },
+    "project_type": {
+      "type": "string",
+      "enum": ["local_business_website", "landing", "corporate"]
+    },
+    "business": {
+      "type": "object",
+      "required": ["name", "type", "city"],
+      "properties": {
+        "name": { "type": "string" },
+        "type": { "type": "string" },
+        "city": { "type": "string" },
+        "district": { "type": "string" },
+        "description": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "address": { "type": "string" },
+        "working_hours": { "type": "string" }
+      }
+    },
+    "goals": {
+      "type": "object",
+      "required": ["primary"],
+      "properties": {
+        "primary": { "type": "string" },
+        "secondary": { "type": "array", "items": { "type": "string" } },
+        "kpis": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "target_audience_hypothesis": {
+      "type": "array",
+      "description": "Гипотезы о ЦА, сформулированные при нормализации",
+      "items": { "type": "string" }
+    },
+    "services": {
+      "type": "array",
+      "description": "Перечень услуг (из брифа или предположения)",
+      "items": { "type": "string" }
+    },
+    "constraints": {
+      "type": "object",
+      "required": ["budget"],
+      "properties": {
+        "budget": { "type": "string", "enum": ["low", "medium", "high"] },
+        "timeline": { "type": "string" },
+        "tech": { "type": "string" },
+        "tech_stack_recommendation": { "type": "string" }
+      }
+    },
+    "assumptions": {
+      "type": "array",
+      "description": "Список допущений сделанных при нормализации. Требуют подтверждения клиентом.",
+      "items": {
+        "type": "object",
+        "required": ["field", "assumed_value", "confidence"],
+        "properties": {
+          "field": { "type": "string" },
+          "assumed_value": { "type": "string" },
+          "confidence": { "type": "string", "enum": ["high", "medium", "low"] },
+          "note": { "type": "string" }
+        }
+      }
+    },
+    "normalized_at": { "type": "string", "format": "date-time" }
+  }
+}

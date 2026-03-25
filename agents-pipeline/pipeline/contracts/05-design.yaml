@@ -1,0 +1,57 @@
+stage_id: "05-design"
+name: "Brand Platform / Design System Brief"
+role: "Brand & Design Strategist"
+
+goal: |
+  Создать практичный дизайн-бриф: цветовая палитра, типографика,
+  tone of voice, компоненты UI, правила секций, UX-принципы.
+  Не абстрактная концепция, а руководство для верстальщика.
+
+inputs:
+  - key: project_brief
+    path: "stages/00-normalize/current/project-brief.yaml"
+    required: true
+    schema: "schemas/project-brief.schema.json"
+
+  - key: discovery_report
+    path: "stages/01-discovery/current/discovery-report.md"
+    required: true
+    schema: null
+
+  - key: sitemap
+    path: "stages/04-ia/current/sitemap.md"
+    required: true
+    schema: null
+
+  - key: competitor_analysis
+    path: "stages/02-competitor/current/competitor-analysis.md"
+    required: false
+    schema: null
+
+outputs:
+  - key: design_brief
+    path: "stages/05-design/current/design-system-brief.md"
+    schema: null
+    description: "Полный дизайн-бриф для реализации"
+
+allowed_sources:
+  - artifact       # brief + discovery + sitemap + competitor
+  - reasoning      # знания о дизайне, UX, трендах в нише
+
+review_required: true
+review_reason: |
+  Дизайн-бриф определяет визуальную идентичность проекта.
+  Требует согласования с клиентом до начала верстки.
+
+completion_criteria:
+  - "Цветовая палитра: primary, secondary, accent, neutral + hex коды"
+  - "Типографика: font families, sizes scale, weights, line-heights"
+  - "Tone of voice: 3-5 характеристик + примеры фраз"
+  - "Компоненты UI: hero, CTA, cards, forms, testimonials — описаны"
+  - "Правила секций для каждого типа страницы"
+  - "UX-принципы: минимум 5 правил"
+  - "Референсы: минимум 2 примера похожих сайтов"
+
+risks:
+  - "Без согласования с клиентом дизайн-бриф может не совпасть с ожиданиями"
+  - "Референсы LLM могут быть устаревшими"

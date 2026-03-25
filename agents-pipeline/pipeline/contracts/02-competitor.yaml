@@ -1,0 +1,49 @@
+stage_id: "02-competitor"
+name: "Competitor Analysis"
+role: "Competitive Intelligence Analyst"
+
+goal: |
+  Проанализировать конкурентов бизнеса: их позиционирование, офферы,
+  сильные и слабые стороны, UX сайтов. Определить рыночные ниши и gaps.
+
+inputs:
+  - key: project_brief
+    path: "stages/00-normalize/current/project-brief.yaml"
+    required: true
+    schema: "schemas/project-brief.schema.json"
+    description: "Нормализованный project brief"
+
+  - key: discovery_report
+    path: "stages/01-discovery/current/discovery-report.md"
+    required: true
+    schema: null
+    description: "Discovery отчёт с гипотезами о рынке"
+
+outputs:
+  - key: competitor_analysis
+    path: "stages/02-competitor/current/competitor-analysis.md"
+    schema: null
+    description: "Анализ конкурентов по шаблону competitor-analysis.md"
+
+allowed_sources:
+  - artifact       # brief + discovery report
+  - reasoning      # LLM reasoning на основе знаний о рынке
+  - web_search     # поиск реальных конкурентов (если доступен)
+
+review_required: true
+review_reason: |
+  Конкурентный анализ критически зависит от актуальности данных.
+  LLM может знать устаревшую информацию о конкурентах.
+  Требуется ручная проверка конкурентов и их текущего состояния.
+
+completion_criteria:
+  - "Идентифицированы минимум 3 конкурента"
+  - "Для каждого конкурента: позиционирование, офферы, цены (если известны), UX сайта"
+  - "Таблица сравнения конкурентов"
+  - "Выявлены рыночные gaps / незакрытые потребности"
+  - "Сформулированы рекомендации по дифференциации"
+
+risks:
+  - "Данные о конкурентах могут быть устаревшими (знания LLM ограничены датой обучения)"
+  - "Локальные конкуренты могут быть неизвестны LLM — требуется реальный поиск"
+  - "Анализ цен почти всегда требует ручной проверки"

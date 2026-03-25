@@ -1,0 +1,149 @@
+# Stages Registry — Agents Pipeline
+# Декларативный реестр всех stages в порядке выполнения.
+# Изменение порядка или добавление stage — только здесь.
+
+version: "1.0"
+
+stages:
+  - id: "00-normalize"
+    name: "Project Brief Normalization"
+    role: "Project Analyst"
+    description: "Преобразует сырой бизнес-бриф в структурированный project brief"
+    contract: "pipeline/contracts/00-normalize.yaml"
+    prompt: "prompts/00-normalize.md"
+    review_required: false
+    llm_required: true
+    deterministic_parts:
+      - "Чтение входного файла"
+      - "Проверка обязательных полей"
+      - "Запись артефакта"
+
+  - id: "01-discovery"
+    name: "Discovery / Market Research"
+    role: "Market Research Analyst"
+    description: "Формирует гипотезы о ЦА, офферах, сегментах и контексте рынка"
+    contract: "pipeline/contracts/01-discovery.yaml"
+    prompt: "prompts/01-discovery.md"
+    review_required: false
+    llm_required: true
+    deterministic_parts:
+      - "Загрузка project brief"
+      - "Структурирование вывода по шаблону"
+
+  - id: "02-competitor"
+    name: "Competitor Analysis"
+    role: "Competitive Intelligence Analyst"
+    description: "Анализирует конкурентов: позиционирование, офферы, сильные/слабые стороны"
+    contract: "pipeline/contracts/02-competitor.yaml"
+    prompt: "prompts/02-competitor.md"
+    review_required: true
+    review_reason: "Конкурентный анализ требует проверки актуальности данных"
+    llm_required: true
+    deterministic_parts:
+      - "Загрузка discovery report"
+
+  - id: "03-seo"
+    name: "SEO / Keyword Clustering"
+    role: "SEO Strategist"
+    description: "Создаёт кластеры поисковых запросов и сопоставляет их со страницами"
+    contract: "pipeline/contracts/03-seo.yaml"
+    prompt: "prompts/03-seo.md"
+    review_required: false
+    llm_required: true
+    deterministic_parts:
+      - "Загрузка discovery + competitor артефактов"
+
+  - id: "04-ia"
+    name: "Information Architecture / Sitemap"
+    role: "Information Architect"
+    description: "Строит структуру сайта, типы страниц, навигацию и иерархию"
+    contract: "pipeline/contracts/04-ia.yaml"
+    prompt: "prompts/04-ia.md"
+    review_required: false
+    llm_required: true
+    deterministic_parts:
+      - "Загрузка SEO кластеров и discovery"
+
+  - id: "05-design"
+    name: "Brand Platform / Design System Brief"
+    role: "Brand & Design Strategist"
+    description: "Создаёт практичный дизайн-бриф: палитра, типографика, тон, компоненты, UX-принципы"
+    contract: "pipeline/contracts/05-design.yaml"
+    prompt: "prompts/05-design.md"
+    review_required: true
+    review_reason: "Дизайн-бриф требует согласования с клиентом перед реализацией"
+    llm_required: true
+    deterministic_parts:
+      - "Загрузка discovery + IA артефактов"
+
+  - id: "06-content-model"
+    name: "Content Model / Page Briefs"
+    role: "Content Strategist"
+    description: "Создаёт типы контента и детальные бриф по каждой странице"
+    contract: "pipeline/contracts/06-content-model.yaml"
+    prompt: "prompts/06-content-model.md"
+    review_required: false
+    llm_required: true
+    deterministic_parts:
+      - "Загрузка IA + SEO + design артефактов"
+
+  - id: "07-frontend"
+    name: "Frontend Implementation"
+    role: "Frontend Engineer"
+    description: "Реализует HTML/CSS/JS на основе дизайн-брифа и page briefs"
+    contract: "pipeline/contracts/07-frontend.yaml"
+    prompt: "prompts/07-frontend.md"
+    review_required: false
+    llm_required: true
+    deterministic_parts:
+      - "Загрузка design brief + IA + content model"
+      - "Создание файловой структуры проекта"
+
+  - id: "08-backend"
+    name: "Backend / CMS / Lead Capture"
+    role: "Backend Engineer"
+    description: "Реализует форму захвата лидов, CMS-конфиг или серверную логику"
+    contract: "pipeline/contracts/08-backend.yaml"
+    prompt: "prompts/08-backend.md"
+    review_required: false
+    llm_required: true
+    deterministic_parts:
+      - "Загрузка frontend артефактов"
+
+  - id: "09-content-gen"
+    name: "Content Generation"
+    role: "Content Writer"
+    description: "Генерирует реальный контент страниц на основе page briefs и keyword clusters"
+    contract: "pipeline/contracts/09-content-gen.yaml"
+    prompt: "prompts/09-content-gen.md"
+    review_required: false
+    llm_required: true
+    deterministic_parts:
+      - "Загрузка content model + SEO кластеров"
+
+  - id: "10-qa"
+    name: "QA / SEO Audit / Final Report"
+    role: "QA & SEO Auditor"
+    description: "Проверяет полноту, связность артефактов и готовность к запуску"
+    contract: "pipeline/contracts/10-qa.yaml"
+    prompt: "prompts/10-qa.md"
+    review_required: true
+    review_reason: "Финальный отчёт требует ручной проверки перед деплоем"
+    llm_required: true
+    deterministic_parts:
+      - "Загрузка всех предыдущих артефактов"
+      - "Проверка наличия обязательных артефактов"
+      - "Генерация artifact-index"
+
+project_types:
+  - id: "local_business_website"
+    name: "Сайт услуг локального бизнеса"
+    required_stages: ["00-normalize", "01-discovery", "02-competitor", "03-seo", "04-ia", "05-design", "06-content-model", "07-frontend", "08-backend", "09-content-gen", "10-qa"]
+
+  - id: "landing"
+    name: "Лендинг"
+    required_stages: ["00-normalize", "01-discovery", "03-seo", "05-design", "06-content-model", "07-frontend", "08-backend", "09-content-gen", "10-qa"]
+
+  - id: "corporate"
+    name: "Корпоративный сайт с SEO-структурой"
+    required_stages: ["00-normalize", "01-discovery", "02-competitor", "03-seo", "04-ia", "05-design", "06-content-model", "07-frontend", "08-backend", "09-content-gen", "10-qa"]
