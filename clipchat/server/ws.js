@@ -43,6 +43,7 @@ function setup(server) {
     }
 
     wss.handleUpgrade(request, socket, head, (ws) => {
+      ws.sessionId = sessionId;
       wss.emit('connection', ws, request);
     });
   });
@@ -87,9 +88,14 @@ function setup(server) {
   function broadcast(event, data) {
     const message = JSON.stringify({ event, data });
     for (const client of clients) {
-      if (client.readyState === 1) { // WebSocket.OPEN
-        client.send(message);
+      if (client.readyState !== 1) continue; // not OPEN
+      // Verify session is still valid before sending
+      if (!client.sessionId || !db.getSession(client.sessionId)) {
+        clients.delete(client);
+        client.close(4001, 'Session expired');
+        continue;
       }
+      client.send(message);
     }
   }
 

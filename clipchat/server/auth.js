@@ -90,54 +90,105 @@ async function changePassword(oldPassword, newPassword) {
   const path = require('path');
   const uploadsDir = path.join(db.DATA_DIR, 'uploads');
 
-  // Re-encrypt all messages
   const messages = db.getAllMessages();
-  const dbInstance = db.getDb();
-  const transaction = dbInstance.transaction(() => {
-    for (const msg of messages) {
-      if (msg.type === 'file') {
-        // File messages: content and filename are self-contained "iv:data_hex"
-        // Re-encrypt content
-        const contentStr = msg.content.toString('utf8');
-        const [cIv, cData] = contentStr.split(':');
-        const decContent = cryptoModule.decrypt(Buffer.from(cData, 'hex'), cIv, oldKey);
-        const { encrypted: encContent, iv: newCIv } = cryptoModule.encrypt(decContent, newKey);
-        const newContentBlob = Buffer.from(`${newCIv}:${encContent.toString('hex')}`);
 
-        // Re-encrypt filename
-        let newFilename = msg.filename;
-        if (msg.filename) {
-          const [fnIv, fnData] = msg.filename.split(':');
-          const decFilename = cryptoModule.decrypt(Buffer.from(fnData, 'hex'), fnIv, oldKey);
-          const { encrypted: encFn, iv: newFnIv } = cryptoModule.encrypt(decFilename, newKey);
-          newFilename = `${newFnIv}:${encFn.toString('hex')}`;
-          db.updateMessageFilename(msg.id, newFilename);
-        }
-
-        // Re-encrypt file on disk
-        const filePath = path.join(uploadsDir, msg.id);
-        if (fs.existsSync(filePath)) {
-          const fileData = fs.readFileSync(filePath);
-          const decFile = cryptoModule.decryptFile(fileData, msg.iv, oldKey);
-          const { encrypted: encFile, iv: newFileIv } = cryptoModule.encryptFile(decFile, newKey);
-          fs.writeFileSync(filePath, encFile);
-          db.updateMessageContent(msg.id, newContentBlob, newFileIv);
-        } else {
-          db.updateMessageContent(msg.id, newContentBlob, msg.iv);
-        }
-      } else {
-        // Text/clip messages: content blob + iv stored directly
-        const decrypted = cryptoModule.decrypt(msg.content, msg.iv, oldKey);
-        const { encrypted, iv } = cryptoModule.encrypt(decrypted, newKey);
-        db.updateMessageContent(msg.id, encrypted, iv);
+  // Phase 1: Re-encrypt file blobs on disk first, keeping old-key backups.
+  // If anything fails here, the originals are untouched.
+  const fileOps = []; // { filePath, newData, backupPath }
+  for (const msg of messages) {
+    if (msg.type === 'file') {
+      const filePath = path.join(uploadsDir, msg.id);
+      if (fs.existsSync(filePath)) {
+        const fileData = fs.readFileSync(filePath);
+        const decFile = cryptoModule.decryptFile(fileData, msg.iv, oldKey);
+        const { encrypted: encFile, iv: newFileIv } = cryptoModule.encryptFile(decFile, newKey);
+        const backupPath = filePath + '.bak';
+        fileOps.push({ filePath, newData: encFile, newFileIv, backupPath, msgId: msg.id });
       }
     }
+  }
 
-    db.setSetting('password_hash', newHash);
-    db.setSetting('encryption_salt', newSalt);
-  });
+  // Create backups of all files before modifying anything
+  for (const op of fileOps) {
+    fs.copyFileSync(op.filePath, op.backupPath);
+  }
 
-  transaction();
+  // Phase 2: Write new encrypted files to disk
+  try {
+    for (const op of fileOps) {
+      fs.writeFileSync(op.filePath, op.newData);
+    }
+  } catch (diskErr) {
+    // Restore backups on failure
+    for (const op of fileOps) {
+      if (fs.existsSync(op.backupPath)) {
+        fs.copyFileSync(op.backupPath, op.filePath);
+        fs.unlinkSync(op.backupPath);
+      }
+    }
+    throw new Error('Failed to re-encrypt files on disk: ' + diskErr.message);
+  }
+
+  // Phase 3: Update DB in a transaction (file blobs are already written with new key)
+  const dbInstance = db.getDb();
+  try {
+    const transaction = dbInstance.transaction(() => {
+      // Build a lookup of new file IVs
+      const newFileIvs = new Map();
+      for (const op of fileOps) {
+        newFileIvs.set(op.msgId, op.newFileIv);
+      }
+
+      for (const msg of messages) {
+        if (msg.type === 'file') {
+          // Re-encrypt content (self-contained "iv:data_hex")
+          const contentStr = msg.content.toString('utf8');
+          const [cIv, cData] = contentStr.split(':');
+          const decContent = cryptoModule.decrypt(Buffer.from(cData, 'hex'), cIv, oldKey);
+          const { encrypted: encContent, iv: newCIv } = cryptoModule.encrypt(decContent, newKey);
+          const newContentBlob = Buffer.from(`${newCIv}:${encContent.toString('hex')}`);
+
+          // Re-encrypt filename
+          if (msg.filename) {
+            const [fnIv, fnData] = msg.filename.split(':');
+            const decFilename = cryptoModule.decrypt(Buffer.from(fnData, 'hex'), fnIv, oldKey);
+            const { encrypted: encFn, iv: newFnIv } = cryptoModule.encrypt(decFilename, newKey);
+            db.updateMessageFilename(msg.id, `${newFnIv}:${encFn.toString('hex')}`);
+          }
+
+          const fileIv = newFileIvs.get(msg.id) || msg.iv;
+          db.updateMessageContent(msg.id, newContentBlob, fileIv);
+        } else {
+          // Text/clip messages
+          const decrypted = cryptoModule.decrypt(msg.content, msg.iv, oldKey);
+          const { encrypted, iv } = cryptoModule.encrypt(decrypted, newKey);
+          db.updateMessageContent(msg.id, encrypted, iv);
+        }
+      }
+
+      db.setSetting('password_hash', newHash);
+      db.setSetting('encryption_salt', newSalt);
+    });
+
+    transaction();
+  } catch (dbErr) {
+    // DB transaction failed and rolled back — restore file backups to match old key
+    for (const op of fileOps) {
+      if (fs.existsSync(op.backupPath)) {
+        fs.copyFileSync(op.backupPath, op.filePath);
+        fs.unlinkSync(op.backupPath);
+      }
+    }
+    throw new Error('Failed to update database: ' + dbErr.message);
+  }
+
+  // Phase 4: Clean up backups on success
+  for (const op of fileOps) {
+    if (fs.existsSync(op.backupPath)) {
+      fs.unlinkSync(op.backupPath);
+    }
+  }
+
   encryptionKey = newKey;
 
   return true;

@@ -320,10 +320,10 @@
       const newMsgs = data.messages || [];
       if (newMsgs.length === 0) {
         hasMore = false;
-        return;
+      } else {
+        messages = [...messages, ...newMsgs];
+        renderMessages();
       }
-      messages = [...messages, ...newMsgs];
-      renderMessages();
     } catch (err) {
       showToast('Ошибка загрузки', 'error');
     }
