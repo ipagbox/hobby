@@ -1,0 +1,12 @@
+version: '3.8'
+services:
+  clipchat:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - PORT=3000
+      - NODE_ENV=production
+    restart: unless-stopped
