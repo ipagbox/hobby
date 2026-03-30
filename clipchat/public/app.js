@@ -303,6 +303,7 @@
       const params = showPinned ? '?pinned=true' : '?limit=50';
       const data = await api('GET', `/messages${params}`);
       messages = data.messages || [];
+      hasMore = !showPinned && messages.length >= 50;
       renderMessages();
     } catch (err) {
       showToast('Ошибка загрузки: ' + err.message, 'error');
