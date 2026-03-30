@@ -9,6 +9,8 @@ const messagesRouter = require('./routes/messages');
 const filesRouter = require('./routes/files');
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
+const SESSION_TTL_DAYS = parseInt(process.env.SESSION_TTL_DAYS || '30', 10);
+const SESSION_COOKIE_MAX_AGE = SESSION_TTL_DAYS * 24 * 60 * 60 * 1000;
 
 // Initialize database
 db.init();
@@ -16,13 +18,24 @@ console.log(`[${new Date().toISOString()}] Database initialized`);
 
 const app = express();
 
-// CORS — restrict to LAN
+// CORS — restrict to LAN by validating Origin hostname
 app.use((req, res, next) => {
   const origin = req.headers.origin || '';
-  const allowed = !origin ||
-    origin.includes('localhost') ||
-    origin.includes('127.0.0.1') ||
-    /^https?:\/\/(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(origin);
+
+  let allowed = !origin; // no Origin header (same-origin, curl, etc.)
+  if (origin) {
+    try {
+      const { hostname } = new URL(origin);
+      allowed =
+        hostname === 'localhost' ||
+        hostname === '127.0.0.1' ||
+        /^192\.168\.\d{1,3}\.\d{1,3}$/.test(hostname) ||
+        /^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname) ||
+        /^172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}$/.test(hostname);
+    } catch {
+      allowed = false;
+    }
+  }
 
   if (allowed) {
     res.setHeader('Access-Control-Allow-Origin', origin || '*');
@@ -58,7 +71,7 @@ app.post('/api/auth/setup', async (req, res) => {
       httpOnly: true,
       sameSite: 'strict',
       secure: false,
-      maxAge: 30 * 24 * 60 * 60 * 1000,
+      maxAge: SESSION_COOKIE_MAX_AGE,
     });
 
     res.json({ success: true });
@@ -93,7 +106,7 @@ app.post('/api/auth/login', async (req, res) => {
       httpOnly: true,
       sameSite: 'strict',
       secure: false,
-      maxAge: 30 * 24 * 60 * 60 * 1000,
+      maxAge: SESSION_COOKIE_MAX_AGE,
     });
 
     res.json({ success: true });
