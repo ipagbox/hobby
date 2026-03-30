@@ -29,14 +29,29 @@ router.get('/', (req, res) => {
     // Decrypt messages for response
     const decrypted = messages.map((msg) => {
       try {
-        const content = decrypt(msg.content, msg.iv, key).toString('utf8');
+        let content;
         let filename = null;
-        if (msg.filename) {
+
+        if (msg.type === 'file') {
+          // File messages store content and filename as self-contained "iv:data_hex"
           try {
-            filename = decrypt(Buffer.from(msg.filename, 'hex'), msg.iv, key).toString('utf8');
+            const contentStr = msg.content.toString('utf8');
+            const [cIv, cData] = contentStr.split(':');
+            content = decrypt(Buffer.from(cData, 'hex'), cIv, key).toString('utf8');
           } catch {
-            filename = msg.filename;
+            content = '[file]';
           }
+          if (msg.filename) {
+            try {
+              const [fnIv, fnData] = msg.filename.split(':');
+              filename = decrypt(Buffer.from(fnData, 'hex'), fnIv, key).toString('utf8');
+            } catch {
+              filename = msg.filename;
+            }
+          }
+        } else {
+          // Text/clip messages: content blob + iv stored directly
+          content = decrypt(msg.content, msg.iv, key).toString('utf8');
         }
         return {
           id: msg.id,

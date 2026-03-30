@@ -41,18 +41,18 @@ router.post('/', upload.single('file'), (req, res) => {
     const uploadsDir = path.join(db.DATA_DIR, 'uploads');
     fs.writeFileSync(path.join(uploadsDir, id), encryptedFile);
 
-    // Encrypt filename for DB storage
-    const { encrypted: encFilename } = encrypt(originalName, key);
+    // Encrypt filename — stored as "iv_hex:data_hex" (self-contained)
+    const { encrypted: encFilename, iv: fnIv } = encrypt(originalName, key);
 
-    // Create a placeholder content (encrypted) — stores original filename reference
-    const { encrypted: encContent, iv } = encrypt(`file:${originalName}`, key);
+    // Encrypt placeholder content — stored as "iv_hex:data_hex" (self-contained)
+    const { encrypted: encContent, iv: contentIv } = encrypt(`file:${originalName}`, key);
 
     db.createMessage({
       id,
       type: 'file',
-      content: encContent,
-      iv,
-      filename: encFilename.toString('hex'),
+      content: Buffer.from(`${contentIv}:${encContent.toString('hex')}`),
+      iv: fileIv, // file blob IV — used to decrypt the on-disk file
+      filename: `${fnIv}:${encFilename.toString('hex')}`,
       filesize,
       mimetype,
       device,
@@ -102,11 +102,12 @@ router.get('/:id', (req, res) => {
       return res.status(404).json({ error: 'File data not found' });
     }
 
-    // Decrypt filename
+    // Decrypt filename (stored as "iv_hex:data_hex")
     let filename = 'download';
     if (msg.filename) {
       try {
-        filename = decrypt(Buffer.from(msg.filename, 'hex'), msg.iv, key).toString('utf8');
+        const [fnIv, fnData] = msg.filename.split(':');
+        filename = decrypt(Buffer.from(fnData, 'hex'), fnIv, key).toString('utf8');
       } catch {
         filename = 'download';
       }

@@ -86,22 +86,50 @@ async function changePassword(oldPassword, newPassword) {
 
   const cryptoModule = require('./crypto');
 
+  const fs = require('fs');
+  const path = require('path');
+  const uploadsDir = path.join(db.DATA_DIR, 'uploads');
+
   // Re-encrypt all messages
   const messages = db.getAllMessages();
   const dbInstance = db.getDb();
   const transaction = dbInstance.transaction(() => {
     for (const msg of messages) {
-      // Decrypt with old key
-      const decrypted = cryptoModule.decrypt(msg.content, msg.iv, oldKey);
-      // Encrypt with new key
-      const { encrypted, iv } = cryptoModule.encrypt(decrypted, newKey);
-      db.updateMessageContent(msg.id, encrypted, iv);
+      if (msg.type === 'file') {
+        // File messages: content and filename are self-contained "iv:data_hex"
+        // Re-encrypt content
+        const contentStr = msg.content.toString('utf8');
+        const [cIv, cData] = contentStr.split(':');
+        const decContent = cryptoModule.decrypt(Buffer.from(cData, 'hex'), cIv, oldKey);
+        const { encrypted: encContent, iv: newCIv } = cryptoModule.encrypt(decContent, newKey);
+        const newContentBlob = Buffer.from(`${newCIv}:${encContent.toString('hex')}`);
 
-      // Re-encrypt filename if present
-      if (msg.filename) {
-        const decFilename = cryptoModule.decrypt(Buffer.from(msg.filename, 'hex'), msg.iv, oldKey);
-        const encFilename = cryptoModule.encrypt(decFilename, newKey);
-        db.updateMessageFilename(msg.id, encFilename.encrypted.toString('hex'));
+        // Re-encrypt filename
+        let newFilename = msg.filename;
+        if (msg.filename) {
+          const [fnIv, fnData] = msg.filename.split(':');
+          const decFilename = cryptoModule.decrypt(Buffer.from(fnData, 'hex'), fnIv, oldKey);
+          const { encrypted: encFn, iv: newFnIv } = cryptoModule.encrypt(decFilename, newKey);
+          newFilename = `${newFnIv}:${encFn.toString('hex')}`;
+          db.updateMessageFilename(msg.id, newFilename);
+        }
+
+        // Re-encrypt file on disk
+        const filePath = path.join(uploadsDir, msg.id);
+        if (fs.existsSync(filePath)) {
+          const fileData = fs.readFileSync(filePath);
+          const decFile = cryptoModule.decryptFile(fileData, msg.iv, oldKey);
+          const { encrypted: encFile, iv: newFileIv } = cryptoModule.encryptFile(decFile, newKey);
+          fs.writeFileSync(filePath, encFile);
+          db.updateMessageContent(msg.id, newContentBlob, newFileIv);
+        } else {
+          db.updateMessageContent(msg.id, newContentBlob, msg.iv);
+        }
+      } else {
+        // Text/clip messages: content blob + iv stored directly
+        const decrypted = cryptoModule.decrypt(msg.content, msg.iv, oldKey);
+        const { encrypted, iv } = cryptoModule.encrypt(decrypted, newKey);
+        db.updateMessageContent(msg.id, encrypted, iv);
       }
     }
 
@@ -111,26 +139,6 @@ async function changePassword(oldPassword, newPassword) {
 
   transaction();
   encryptionKey = newKey;
-
-  // Re-encrypt uploaded files on disk
-  const fs = require('fs');
-  const path = require('path');
-  const uploadsDir = path.join(db.DATA_DIR, 'uploads');
-  for (const msg of messages) {
-    if (msg.type === 'file') {
-      const filePath = path.join(uploadsDir, msg.id);
-      if (fs.existsSync(filePath)) {
-        const fileData = fs.readFileSync(filePath);
-        const decrypted = cryptoModule.decryptFile(fileData, msg.iv, oldKey);
-        // Re-read fresh IV from DB after re-encryption
-        const updated = db.getMessage(msg.id);
-        const { encrypted } = cryptoModule.encryptFile(decrypted, newKey);
-        // Update file IV in DB
-        db.updateMessageContent(updated.id, updated.content, updated.iv);
-        fs.writeFileSync(filePath, encrypted);
-      }
-    }
-  }
 
   return true;
 }
@@ -159,8 +167,9 @@ function checkRateLimit(ip) {
  * Auth middleware — validates session cookie
  */
 function authMiddleware(req, res, next) {
-  // Allow unauthenticated access to auth endpoints
-  if (req.path.startsWith('/api/auth/')) {
+  // Allow unauthenticated access to public auth endpoints only
+  const publicAuthPaths = ['/api/auth/setup', '/api/auth/login', '/api/auth/logout', '/api/auth/check'];
+  if (publicAuthPaths.includes(req.path)) {
     return next();
   }
 

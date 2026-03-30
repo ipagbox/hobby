@@ -111,14 +111,17 @@ function cleanExpiredSessions(ttlSeconds) {
 
 function getMessages(limit = 50, beforeId = null) {
   if (beforeId) {
-    const ref = getDb().prepare('SELECT created_at FROM messages WHERE id = ?').get(beforeId);
+    const ref = getDb().prepare('SELECT created_at, id FROM messages WHERE id = ?').get(beforeId);
     if (!ref) return [];
+    // Use (created_at, id) tie-breaker to avoid skipping messages with same timestamp
     return getDb().prepare(
-      'SELECT * FROM messages WHERE created_at < ? ORDER BY created_at DESC LIMIT ?'
-    ).all(ref.created_at, limit);
+      `SELECT * FROM messages
+       WHERE created_at < ? OR (created_at = ? AND id < ?)
+       ORDER BY created_at DESC, id DESC LIMIT ?`
+    ).all(ref.created_at, ref.created_at, ref.id, limit);
   }
   return getDb().prepare(
-    'SELECT * FROM messages ORDER BY created_at DESC LIMIT ?'
+    'SELECT * FROM messages ORDER BY created_at DESC, id DESC LIMIT ?'
   ).all(limit);
 }
 
