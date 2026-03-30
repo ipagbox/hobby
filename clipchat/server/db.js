@@ -102,6 +102,10 @@ function deleteSession(id) {
   getDb().prepare('DELETE FROM sessions WHERE id = ?').run(id);
 }
 
+function deleteOtherSessions(keepId) {
+  getDb().prepare('DELETE FROM sessions WHERE id != ?').run(keepId);
+}
+
 function cleanExpiredSessions(ttlSeconds) {
   const cutoff = Math.floor(Date.now() / 1000) - ttlSeconds;
   getDb().prepare('DELETE FROM sessions WHERE last_active < ?').run(cutoff);
@@ -197,6 +201,7 @@ module.exports = {
   getSession,
   touchSession,
   deleteSession,
+  deleteOtherSessions,
   cleanExpiredSessions,
   getMessages,
   getPinnedMessages,

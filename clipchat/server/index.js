@@ -149,7 +149,7 @@ app.post('/api/auth/change-password', auth.authMiddleware, async (req, res) => {
     if (newPassword.length < 4) {
       return res.status(400).json({ error: 'New password must be at least 4 characters' });
     }
-    await auth.changePassword(oldPassword, newPassword);
+    await auth.changePassword(oldPassword, newPassword, req.sessionId);
     res.json({ success: true });
   } catch (e) {
     console.error(`[${new Date().toISOString()}] Change password error:`, e.message);

@@ -2,6 +2,7 @@
 const { WebSocketServer } = require('ws');
 const url = require('url');
 const db = require('./db');
+const { SESSION_TTL_SECONDS } = require('./auth');
 
 /**
  * Setup WebSocket server on existing HTTP server
@@ -41,6 +42,17 @@ function setup(server) {
       socket.destroy();
       return;
     }
+
+    // Check session TTL (same as HTTP auth middleware)
+    const now = Math.floor(Date.now() / 1000);
+    if (now - session.last_active > SESSION_TTL_SECONDS) {
+      db.deleteSession(sessionId);
+      socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+      socket.destroy();
+      return;
+    }
+
+    db.touchSession(sessionId);
 
     wss.handleUpgrade(request, socket, head, (ws) => {
       ws.sessionId = sessionId;

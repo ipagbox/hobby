@@ -72,7 +72,7 @@ async function login(password, userAgent) {
 /**
  * Change password and re-encrypt all data
  */
-async function changePassword(oldPassword, newPassword) {
+async function changePassword(oldPassword, newPassword, currentSessionId) {
   const hash = db.getSetting('password_hash');
   const valid = await bcrypt.compare(oldPassword, hash);
   if (!valid) throw new Error('Invalid current password');
@@ -191,6 +191,11 @@ async function changePassword(oldPassword, newPassword) {
 
   encryptionKey = newKey;
 
+  // Revoke all sessions except the current one
+  if (currentSessionId) {
+    db.deleteOtherSessions(currentSessionId);
+  }
+
   return true;
 }
 
@@ -285,4 +290,5 @@ module.exports = {
   getEncryptionKey,
   setEncryptionKey,
   startSessionCleanup,
+  SESSION_TTL_SECONDS,
 };

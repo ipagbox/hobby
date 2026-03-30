@@ -10,7 +10,7 @@ const router = express.Router();
 // GET /api/messages — list messages with cursor pagination
 router.get('/', (req, res) => {
   try {
-    const limit = Math.min(parseInt(req.query.limit || '50', 10), 100);
+    const limit = Math.max(1, Math.min(parseInt(req.query.limit || '50', 10) || 50, 100));
     const before = req.query.before || null;
     const pinned = req.query.pinned === 'true';
 
